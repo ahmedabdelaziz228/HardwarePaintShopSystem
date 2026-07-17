@@ -1,0 +1,347 @@
+<UserControl x:Class="HardwarePaintShop.Desktop.Views.Products.ProductsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             FlowDirection="RightToLeft"
+             Background="{StaticResource ContentBackgroundBrush}">
+    <Grid Margin="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0"
+                Visibility="{Binding StatusMessage, Converter={StaticResource StringToVisibilityConverter}}"
+                Margin="0,0,0,10" Padding="12,8" CornerRadius="6">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Background" Value="#FFEBEE"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsSuccess}" Value="True">
+                            <Setter Property="Background" Value="#E8F5E9"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="{StaticResource ErrorBrush}"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsSuccess}" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource SuccessBrush}"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+        </Border>
+
+        <Border Grid.Row="1" Style="{StaticResource CardStyle}" Padding="12" Margin="0,0,0,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="190"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="SearchBox" Grid.Column="0"
+                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource AppTextBoxStyle}"
+                         ToolTip="بحث بالاسم أو الكود أو الباركود أو السيريال"
+                         KeyDown="SearchBox_KeyDown"
+                         Margin="0,0,8,0"/>
+                <ComboBox Grid.Column="1"
+                          ItemsSource="{Binding CategoryFilterOptions}"
+                          SelectedValue="{Binding SelectedCategoryId}"
+                          SelectedValuePath="Id" DisplayMemberPath="Name"
+                          Style="{StaticResource AppComboBoxStyle}"
+                          Margin="0,0,8,0"/>
+                <CheckBox Grid.Column="2" Content="إظهار المعطّل"
+                          IsChecked="{Binding IncludeInactive}"
+                          VerticalAlignment="Center" Margin="0,0,12,0"/>
+                <Button Grid.Column="3" Content="🔍 بحث"
+                        Command="{Binding LoadCommand}"
+                        Style="{StaticResource SecondaryButtonStyle}" Margin="0,0,8,0"/>
+                <Button Grid.Column="4" Content="➕ منتج جديد"
+                        Command="{Binding NewProductCommand}"
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        IsEnabled="{Binding CanCreate}"/>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="410"/>
+                <ColumnDefinition Width="10"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Style="{StaticResource CardStyle}" Padding="12">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+                        <TextBlock Text="قائمة المنتجات" Style="{StaticResource SectionHeaderStyle}" Margin="0"/>
+                        <TextBlock Text="{Binding Products.Count, StringFormat='  ({0})'}"
+                                   Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <ProgressBar DockPanel.Dock="Bottom" IsIndeterminate="True" Height="3"
+                                 Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}"
+                                 Foreground="{StaticResource PrimaryBrush}" Margin="0,8,0,0"/>
+                    <DataGrid ItemsSource="{Binding Products}"
+                              SelectedItem="{Binding SelectedProduct}"
+                              Style="{StaticResource AppDataGridStyle}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="الكود" Binding="{Binding ProductCode}" Width="85"/>
+                            <DataGridTextColumn Header="المنتج" Binding="{Binding Name}" Width="*"/>
+                            <DataGridTextColumn Header="الرصيد" Binding="{Binding StockBaseQuantity, StringFormat=N3}" Width="70"/>
+                            <DataGridTemplateColumn Header="إجراءات" Width="105">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Button Content="✏️" Padding="7,4" Margin="0,0,3,0"
+                                                    ToolTip="تعديل"
+                                                    Style="{StaticResource SecondaryButtonStyle}"
+                                                    Command="{Binding DataContext.EditProductCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"/>
+                                            <Button Padding="7,4"
+                                                    ToolTip="تعطيل / تفعيل"
+                                                    Style="{StaticResource DangerButtonStyle}"
+                                                    Command="{Binding DataContext.ToggleActiveCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}">
+                                                <Button.Content>
+                                                    <TextBlock Text="{Binding IsActive, Converter={StaticResource BoolToStringConverter}, ConverterParameter='🚫|✅'}"/>
+                                                </Button.Content>
+                                            </Button>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </Border>
+
+            <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="14">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+                        <TextBlock Style="{StaticResource SectionHeaderStyle}" Margin="0">
+                            <Run Text="{Binding IsEditing, Converter={StaticResource BoolToStringConverter}, ConverterParameter='تعديل المنتج|إضافة منتج جديد'}"/>
+                        </TextBlock>
+                        <TextBlock Text="  — الوحدات والأسعار والباركود تُحفظ مع المنتج"
+                                   Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,10,0,0">
+                        <Button Content="💾 حفظ المنتج"
+                                Command="{Binding SaveCommand}"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBoolConverter}}"
+                                Margin="0,0,8,0"/>
+                        <Button Content="إلغاء / جديد"
+                                Command="{Binding NewProductCommand}"
+                                Style="{StaticResource SecondaryButtonStyle}"/>
+                    </StackPanel>
+
+                    <TabControl>
+                        <TabItem Header="البيانات الأساسية">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <Grid Margin="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="12"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="12"/>
+                                        <ColumnDefinition Width="150"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="اسم المنتج *" Style="{StaticResource LabelStyle}"/>
+                                    <TextBlock Grid.Row="0" Grid.Column="2" Text="كود المنتج" Style="{StaticResource LabelStyle}"/>
+                                    <TextBox Grid.Row="1" Grid.Column="0" Text="{Binding FormName, UpdateSourceTrigger=PropertyChanged}"
+                                             Style="{StaticResource AppTextBoxStyle}" Margin="0,4,0,10"/>
+                                    <TextBox Grid.Row="1" Grid.Column="2" Text="{Binding FormProductCode, UpdateSourceTrigger=PropertyChanged}"
+                                             Style="{StaticResource AppTextBoxStyle}" Margin="0,4,0,10"/>
+
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="التصنيف" Style="{StaticResource LabelStyle}"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="2" Text="الوحدة الأساسية *" Style="{StaticResource LabelStyle}"/>
+                                    <ComboBox Grid.Row="3" Grid.Column="0" ItemsSource="{Binding CategoryFormOptions}"
+                                              SelectedValue="{Binding FormCategoryId}" SelectedValuePath="Id" DisplayMemberPath="Name"
+                                              Style="{StaticResource AppComboBoxStyle}" Margin="0,4,0,10"/>
+                                    <ComboBox Grid.Row="3" Grid.Column="2" ItemsSource="{Binding Units}"
+                                              SelectedValue="{Binding FormBaseUnitId}" SelectedValuePath="Id" DisplayMemberPath="Name"
+                                              Style="{StaticResource AppComboBoxStyle}" Margin="0,4,0,10"/>
+
+                                    <TextBlock Grid.Row="4" Grid.Column="0" Text="حد إعادة الطلب (بالوحدة الأساسية)" Style="{StaticResource LabelStyle}"/>
+                                    <TextBox Grid.Row="5" Grid.Column="0" Text="{Binding FormMinStockBaseQuantity, UpdateSourceTrigger=LostFocus}"
+                                             Style="{StaticResource AppTextBoxStyle}" Margin="0,4,0,10"/>
+                                    <TextBlock Grid.Row="4" Grid.Column="2" Text="المورد الرئيسي" Style="{StaticResource LabelStyle}"/>
+                                    <ComboBox Grid.Row="5" Grid.Column="2" ItemsSource="{Binding Suppliers}"
+                                              SelectedValue="{Binding FormMainSupplierId}" SelectedValuePath="Id" DisplayMemberPath="Name"
+                                              Style="{StaticResource AppComboBoxStyle}" Margin="0,4,0,10"/>
+                                    <StackPanel Grid.Row="8" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal" Margin="0,8,0,10">
+                                        <CheckBox Content="يتتبع سيريال نمبر" IsChecked="{Binding FormIsSerialTracked}" Margin="0,0,16,0"/>
+                                        <CheckBox Content="المنتج نشط" IsChecked="{Binding FormIsActive}"/>
+                                    </StackPanel>
+
+                                    <TextBlock Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="3" Text="ملاحظات" Style="{StaticResource LabelStyle}"/>
+                                    <TextBox Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="3"
+                                             Text="{Binding FormNotes, UpdateSourceTrigger=PropertyChanged}"
+                                             TextWrapping="Wrap" AcceptsReturn="True" Height="75"
+                                             VerticalScrollBarVisibility="Auto" Margin="0,4,0,10"/>
+
+                                    <Border Grid.Row="0" Grid.RowSpan="8" Grid.Column="4"
+                                            BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="6">
+                                        <StackPanel>
+                                            <Border Height="115" Background="#F4F6F8" CornerRadius="4">
+                                                <Image Source="{Binding FormImagePath}" Stretch="Uniform"/>
+                                            </Border>
+                                            <Button Content="اختيار صورة" Command="{Binding BrowseImageCommand}"
+                                                    Style="{StaticResource SecondaryButtonStyle}" Margin="0,8,0,4"/>
+                                            <Button Content="إزالة الصورة" Command="{Binding ClearImageCommand}"
+                                                    Style="{StaticResource DangerButtonStyle}"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </ScrollViewer>
+                        </TabItem>
+
+                        <TabItem Header="وحدات المنتج">
+                            <DockPanel Margin="10">
+                                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+                                    <Button Content="➕ إضافة وحدة" Command="{Binding AddUnitCommand}"
+                                            Style="{StaticResource SecondaryButtonStyle}"/>
+                                    <TextBlock Text="  مثال: 1 كرتونة = 12 قطعة. الوحدة الأساسية معاملها دائمًا 1."
+                                               Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <DataGrid ItemsSource="{Binding ProductUnits}" Style="{StaticResource AppDataGridStyle}">
+                                    <DataGrid.Columns>
+                                        <DataGridTemplateColumn Header="الوحدة" Width="*">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <ComboBox ItemsSource="{Binding DataContext.Units, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                              SelectedValue="{Binding UnitId, UpdateSourceTrigger=PropertyChanged}"
+                                                              SelectedValuePath="Id" DisplayMemberPath="Name"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTemplateColumn Header="معامل التحويل" Width="120">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate><TextBox Text="{Binding ConversionFactorToBase, UpdateSourceTrigger=LostFocus}"/></DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridCheckBoxColumn Header="افتراضي شراء" Binding="{Binding IsDefaultPurchase}" Width="95"/>
+                                        <DataGridCheckBoxColumn Header="افتراضي بيع" Binding="{Binding IsDefaultSale}" Width="90"/>
+                                        <DataGridTemplateColumn Header="" Width="55">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Button Content="✖" Style="{StaticResource DangerButtonStyle}" Padding="7,3"
+                                                            Command="{Binding DataContext.RemoveUnitCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding}"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </DockPanel>
+                        </TabItem>
+
+                        <TabItem Header="الأسعار">
+                            <DockPanel Margin="10">
+                                <Button DockPanel.Dock="Top" Content="➕ إضافة سعر"
+                                        Command="{Binding AddPriceCommand}" Style="{StaticResource SecondaryButtonStyle}"
+                                        HorizontalAlignment="Right" Margin="0,0,0,8"/>
+                                <DataGrid ItemsSource="{Binding ProductPrices}" Style="{StaticResource AppDataGridStyle}">
+                                    <DataGrid.Columns>
+                                        <DataGridTemplateColumn Header="الوحدة" Width="*">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <ComboBox ItemsSource="{Binding DataContext.Units, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                              SelectedValue="{Binding UnitId}" SelectedValuePath="Id" DisplayMemberPath="Name"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTemplateColumn Header="فئة السعر" Width="*">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <ComboBox ItemsSource="{Binding DataContext.PriceGroups, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                              SelectedValue="{Binding PriceGroupId}" SelectedValuePath="Id" DisplayMemberPath="Name"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTemplateColumn Header="سعر البيع" Width="110">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate><TextBox Text="{Binding SalePrice, UpdateSourceTrigger=LostFocus}"/></DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTemplateColumn Header="أقل سعر" Width="105">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate><TextBox Text="{Binding MinSalePrice, UpdateSourceTrigger=LostFocus}"/></DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTemplateColumn Header="" Width="55">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Button Content="✖" Style="{StaticResource DangerButtonStyle}" Padding="7,3"
+                                                            Command="{Binding DataContext.RemovePriceCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding}"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </DockPanel>
+                        </TabItem>
+
+                        <TabItem Header="الباركود">
+                            <DockPanel Margin="10">
+                                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+                                    <Button Content="➕ إضافة باركود" Command="{Binding AddBarcodeCommand}"
+                                            Style="{StaticResource SecondaryButtonStyle}"/>
+                                    <TextBlock Text="  اترك الوحدة فارغة لو الباركود عام للمنتج."
+                                               Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <DataGrid ItemsSource="{Binding ProductBarcodes}" Style="{StaticResource AppDataGridStyle}">
+                                    <DataGrid.Columns>
+                                        <DataGridTemplateColumn Header="الباركود" Width="*">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate><TextBox Text="{Binding Barcode, UpdateSourceTrigger=PropertyChanged}"/></DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTemplateColumn Header="الوحدة (اختياري)" Width="200">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <ComboBox ItemsSource="{Binding DataContext.Units, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                              SelectedValue="{Binding UnitId}" SelectedValuePath="Id" DisplayMemberPath="Name"
+                                                              IsSynchronizedWithCurrentItem="False"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTemplateColumn Header="" Width="55">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Button Content="✖" Style="{StaticResource DangerButtonStyle}" Padding="7,3"
+                                                            Command="{Binding DataContext.RemoveBarcodeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding}"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </DockPanel>
+                        </TabItem>
+                    </TabControl>
+                </DockPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

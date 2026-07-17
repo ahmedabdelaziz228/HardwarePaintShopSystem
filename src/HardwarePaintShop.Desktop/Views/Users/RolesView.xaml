@@ -1,0 +1,121 @@
+<UserControl x:Class="HardwarePaintShop.Desktop.Views.Users.RolesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             FlowDirection="RightToLeft"
+             Background="{StaticResource ContentBackgroundBrush}">
+
+    <Grid Margin="20">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="280"/>
+            <ColumnDefinition Width="16"/>
+            <ColumnDefinition Width="300"/>
+            <ColumnDefinition Width="16"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- ===== Col 0: Roles List ===== -->
+        <Border Grid.Column="0" Style="{StaticResource CardStyle}">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Text="الأدوار"
+                           Style="{StaticResource SectionHeaderStyle}"/>
+                <Button DockPanel.Dock="Top" Content="➕ دور جديد"
+                        Command="{Binding NewRoleCommand}"
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        Margin="0,0,0,12"
+                        HorizontalAlignment="Stretch"/>
+                <ListBox ItemsSource="{Binding Roles}"
+                         SelectedItem="{Binding SelectedRole}"
+                         BorderThickness="0"
+                         Background="Transparent"
+                         DisplayMemberPath="Name"
+                         FontSize="13"/>
+            </DockPanel>
+        </Border>
+
+        <!-- ===== Col 2: Role Form ===== -->
+        <Border Grid.Column="2" Style="{StaticResource CardStyle}">
+            <StackPanel>
+                <TextBlock Text="بيانات الدور" Style="{StaticResource SectionHeaderStyle}"/>
+
+                <Border Visibility="{Binding StatusMessage, Converter={StaticResource StringToVisibilityConverter}}"
+                        Margin="0,0,0,12" Padding="12,8" CornerRadius="6">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Background" Value="#FFEBEE"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsSuccess}" Value="True">
+                                    <Setter Property="Background" Value="#E8F5E9"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <TextBlock Text="{Binding StatusMessage}" FontSize="13">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="{StaticResource ErrorBrush}"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsSuccess}" Value="True">
+                                        <Setter Property="Foreground" Value="{StaticResource SuccessBrush}"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Border>
+
+                <Label Content="اسم الدور *" FontWeight="SemiBold" FontSize="13"/>
+                <TextBox Text="{Binding FormName, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource AppTextBoxStyle}" Margin="0,0,0,10"/>
+
+                <Label Content="الوصف" FontWeight="SemiBold" FontSize="13"/>
+                <TextBox Text="{Binding FormDescription, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource AppTextBoxStyle}"
+                         Height="70" TextWrapping="Wrap" AcceptsReturn="True"
+                         Margin="0,0,0,16"/>
+
+                <Button Content="💾 حفظ الدور"
+                        Command="{Binding SaveRoleCommand}"
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        HorizontalAlignment="Stretch"
+                        IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBoolConverter}}"/>
+
+                <ProgressBar IsIndeterminate="True" Height="3"
+                             Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}"
+                             Foreground="{StaticResource PrimaryBrush}" Margin="0,12,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <!-- ===== Col 4: Permissions ===== -->
+        <Border Grid.Column="4" Style="{StaticResource CardStyle}">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Text="الصلاحيات للدور المحدد"
+                           Style="{StaticResource SectionHeaderStyle}"/>
+
+                <Button DockPanel.Dock="Bottom"
+                        Content="💾 حفظ الصلاحيات"
+                        Command="{Binding SavePermissionsCommand}"
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        HorizontalAlignment="Stretch"
+                        Margin="0,12,0,0"
+                        IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBoolConverter}}"/>
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding Permissions}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox IsChecked="{Binding IsGranted, Mode=TwoWay}"
+                                          Content="{Binding Name}"
+                                          Margin="0,5"
+                                          FontSize="13"
+                                          Foreground="{StaticResource TextPrimaryBrush}"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+    </Grid>
+</UserControl>

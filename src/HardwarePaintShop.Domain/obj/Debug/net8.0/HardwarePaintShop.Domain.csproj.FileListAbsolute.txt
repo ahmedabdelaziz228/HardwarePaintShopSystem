@@ -1,0 +1,11 @@
+D:\New folder (2)\HardwarePaintShopSystem_v1.1_MobileSync_RC1_Source\HardwarePaintShopSystem\src\HardwarePaintShop.Domain\bin\Debug\net8.0\HardwarePaintShop.Domain.deps.json
+D:\New folder (2)\HardwarePaintShopSystem_v1.1_MobileSync_RC1_Source\HardwarePaintShopSystem\src\HardwarePaintShop.Domain\bin\Debug\net8.0\HardwarePaintShop.Domain.dll
+D:\New folder (2)\HardwarePaintShopSystem_v1.1_MobileSync_RC1_Source\HardwarePaintShopSystem\src\HardwarePaintShop.Domain\bin\Debug\net8.0\HardwarePaintShop.Domain.pdb
+D:\New folder (2)\HardwarePaintShopSystem_v1.1_MobileSync_RC1_Source\HardwarePaintShopSystem\src\HardwarePaintShop.Domain\obj\Debug\net8.0\HardwarePaintShop.Domain.GeneratedMSBuildEditorConfig.editorconfig
+D:\New folder (2)\HardwarePaintShopSystem_v1.1_MobileSync_RC1_Source\HardwarePaintShopSystem\src\HardwarePaintShop.Domain\obj\Debug\net8.0\HardwarePaintShop.Domain.AssemblyInfoInputs.cache
+D:\New folder (2)\HardwarePaintShopSystem_v1.1_MobileSync_RC1_Source\HardwarePaintShopSystem\src\HardwarePaintShop.Domain\obj\Debug\net8.0\HardwarePaintShop.Domain.AssemblyInfo.cs
+D:\New folder (2)\HardwarePaintShopSystem_v1.1_MobileSync_RC1_Source\HardwarePaintShopSystem\src\HardwarePaintShop.Domain\obj\Debug\net8.0\HardwarePaintShop.Domain.csproj.CoreCompileInputs.cache
+D:\New folder (2)\HardwarePaintShopSystem_v1.1_MobileSync_RC1_Source\HardwarePaintShopSystem\src\HardwarePaintShop.Domain\obj\Debug\net8.0\HardwarePaintShop.Domain.dll
+D:\New folder (2)\HardwarePaintShopSystem_v1.1_MobileSync_RC1_Source\HardwarePaintShopSystem\src\HardwarePaintShop.Domain\obj\Debug\net8.0\refint\HardwarePaintShop.Domain.dll
+D:\New folder (2)\HardwarePaintShopSystem_v1.1_MobileSync_RC1_Source\HardwarePaintShopSystem\src\HardwarePaintShop.Domain\obj\Debug\net8.0\HardwarePaintShop.Domain.pdb
+D:\New folder (2)\HardwarePaintShopSystem_v1.1_MobileSync_RC1_Source\HardwarePaintShopSystem\src\HardwarePaintShop.Domain\obj\Debug\net8.0\ref\HardwarePaintShop.Domain.dll

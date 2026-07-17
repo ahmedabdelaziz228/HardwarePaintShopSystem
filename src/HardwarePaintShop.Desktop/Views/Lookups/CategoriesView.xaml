@@ -1,0 +1,156 @@
+<UserControl x:Class="HardwarePaintShop.Desktop.Views.Lookups.CategoriesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             FlowDirection="RightToLeft"
+             Background="{StaticResource ContentBackgroundBrush}">
+
+    <Grid Margin="20">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="340"/>
+            <ColumnDefinition Width="16"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- ===== Left: Category Tree ===== -->
+        <Border Grid.Column="0" Style="{StaticResource CardStyle}">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+                    <TextBlock Text="شجرة الأصناف" Style="{StaticResource SectionHeaderStyle}"/>
+                    <Button Content="➕ صنف جديد"
+                            Command="{Binding NewCategoryCommand}"
+                            Style="{StaticResource PrimaryButtonStyle}"
+                            HorizontalAlignment="Stretch"/>
+                </StackPanel>
+
+                <TreeView ItemsSource="{Binding Nodes}"
+                          BorderThickness="0"
+                          Background="Transparent">
+                    <TreeView.ItemTemplate>
+                        <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                            <StackPanel Orientation="Horizontal" Margin="2,3">
+                                <TextBlock Text="📁 " FontSize="13"/>
+                                <TextBlock Text="{Binding Name}" FontSize="13"
+                                           Foreground="{StaticResource TextPrimaryBrush}"/>
+                            </StackPanel>
+                        </HierarchicalDataTemplate>
+                    </TreeView.ItemTemplate>
+                </TreeView>
+            </DockPanel>
+        </Border>
+
+        <!-- ===== Right: Form Panel ===== -->
+        <Border Grid.Column="2" Style="{StaticResource CardStyle}">
+            <StackPanel>
+                <TextBlock Style="{StaticResource SectionHeaderStyle}">
+                    <Run Text="{Binding IsEditing, Converter={StaticResource BoolToStringConverter},
+                            ConverterParameter='تعديل صنف|إضافة صنف جديد'}"/>
+                </TextBlock>
+
+                <!-- Status Message -->
+                <Border Visibility="{Binding StatusMessage, Converter={StaticResource StringToVisibilityConverter}}"
+                        Margin="0,0,0,12" Padding="12,8" CornerRadius="6">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Background" Value="#FFEBEE"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsSuccess}" Value="True">
+                                    <Setter Property="Background" Value="#E8F5E9"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <TextBlock Text="{Binding StatusMessage}" FontSize="13">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="{StaticResource ErrorBrush}"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsSuccess}" Value="True">
+                                        <Setter Property="Foreground" Value="{StaticResource SuccessBrush}"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Border>
+
+                <!-- Form Fields -->
+                <Label Content="اسم الصنف *" FontWeight="SemiBold" FontSize="13"/>
+                <TextBox x:Name="TxtCatName"
+                         Text="{Binding FormName, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource AppTextBoxStyle}"
+                         Margin="0,0,0,12"/>
+
+                <Label Content="الصنف الأب" FontWeight="SemiBold" FontSize="13"/>
+                <ComboBox ItemsSource="{Binding ParentOptions}"
+                          SelectedValue="{Binding FormParentId}"
+                          SelectedValuePath="Id"
+                          DisplayMemberPath="Name"
+                          Style="{StaticResource AppComboBoxStyle}"
+                          Margin="0,0,0,12"/>
+
+                <Label Content="ملاحظات" FontWeight="SemiBold" FontSize="13"/>
+                <TextBox Text="{Binding FormNotes, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource AppTextBoxStyle}"
+                         Height="80" TextWrapping="Wrap" AcceptsReturn="True"
+                         VerticalScrollBarVisibility="Auto"
+                         Margin="0,0,0,16"/>
+
+                <!-- Action Buttons -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                    <Button Content="💾 حفظ"
+                            Command="{Binding SaveCommand}"
+                            Style="{StaticResource PrimaryButtonStyle}"
+                            Margin="0,0,8,0"
+                            IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBoolConverter}}"/>
+                    <Button Content="✖ إلغاء"
+                            Command="{Binding NewCategoryCommand}"
+                            Style="{StaticResource SecondaryButtonStyle}"/>
+                </StackPanel>
+
+                <Separator Style="{StaticResource SectionSeparatorStyle}" Margin="0,20"/>
+
+                <!-- Flat list for quick edit/delete -->
+                <TextBlock Text="جميع الأصناف" Style="{StaticResource SectionHeaderStyle}"/>
+                <DataGrid ItemsSource="{Binding FlatList}"
+                          Style="{StaticResource AppDataGridStyle}"
+                          MaxHeight="320"
+                          SelectedItem="{Binding SelectedNode}">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="الاسم"      Binding="{Binding Name}"   Width="*"/>
+                        <DataGridTemplateColumn Header="إجراءات" Width="140">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button Content="✏️"
+                                                Command="{Binding DataContext.EditCategoryCommand,
+                                                    RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                Style="{StaticResource SecondaryButtonStyle}"
+                                                Padding="8,4" Margin="0,0,4,0"
+                                                ToolTip="تعديل"/>
+                                        <Button Content="🗑️"
+                                                Command="{Binding DataContext.DeleteCommand,
+                                                    RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                Style="{StaticResource DangerButtonStyle}"
+                                                Padding="8,4"
+                                                ToolTip="حذف"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <!-- Loading Indicator -->
+                <ProgressBar IsIndeterminate="True" Height="3"
+                             Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}"
+                             Foreground="{StaticResource PrimaryBrush}"
+                             Margin="0,8,0,0"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

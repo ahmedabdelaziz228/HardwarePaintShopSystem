@@ -1,0 +1,20 @@
+﻿HardwarePaintShop.Desktop
+1.1.0.0
+
+winexe
+C#
+.cs
+D:\New folder (2)\HardwarePaintShopSystem_v1.1_MobileSync_RC1_Source\HardwarePaintShopSystem\src\HardwarePaintShop.Desktop\obj\Debug\net8.0-windows\
+HardwarePaintShop.Desktop
+none
+false
+TRACE;DEBUG;NET;NET8_0;NETCOREAPP;WINDOWS;WINDOWS7_0;NET5_0_OR_GREATER;NET6_0_OR_GREATER;NET7_0_OR_GREATER;NET8_0_OR_GREATER;NETCOREAPP3_0_OR_GREATER;NETCOREAPP3_1_OR_GREATER;WINDOWS7_0_OR_GREATER
+D:\New folder (2)\HardwarePaintShopSystem_v1.1_MobileSync_RC1_Source\HardwarePaintShopSystem\src\HardwarePaintShop.Desktop\App.xaml
+32110370562
+
+62-275945947
+230140298511
+Styles\Buttons.xaml;Styles\Cards.xaml;Styles\Colors.xaml;Styles\DataGrids.xaml;Styles\Forms.xaml;Views\Dashboard\DashboardView.xaml;Views\Finance\CashboxesView.xaml;Views\Finance\FinanceOperationsView.xaml;Views\Inventory\AlertsView.xaml;Views\Inventory\InventoryView.xaml;Views\Lookups\CategoriesView.xaml;Views\Lookups\ExpenseCategoriesView.xaml;Views\Lookups\PriceGroupsView.xaml;Views\Lookups\UnitsView.xaml;Views\Parties\CustomersView.xaml;Views\Parties\SuppliersView.xaml;Views\Products\PriceInquiryView.xaml;Views\Products\ProductsView.xaml;Views\Purchases\PurchaseInvoicesView.xaml;Views\Reports\ReportsView.xaml;Views\Returns\ReturnsView.xaml;Views\Sales\SalesPosView.xaml;Views\Settings\BackupView.xaml;Views\Settings\LicenseView.xaml;Views\Settings\SettingsView.xaml;Views\Shell\ActivationWindow.xaml;Views\Shell\DatabaseSetupWindow.xaml;Views\Shell\LoginWindow.xaml;Views\Shell\MainWindow.xaml;Views\Shell\NotImplementedView.xaml;Views\Users\RolesView.xaml;Views\Users\UsersView.xaml;
+
+True
+
