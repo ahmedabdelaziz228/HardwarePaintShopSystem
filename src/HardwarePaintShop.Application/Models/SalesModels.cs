@@ -26,6 +26,11 @@ public sealed class SalesInvoiceDetails
     public decimal TotalAmount { get; init; }
     public decimal PaidAmount { get; init; }
     public decimal RemainingAmount { get; init; }
+    public decimal CustomerBalanceBefore { get; init; }
+    public decimal CustomerBalanceAfter { get; init; }
+    public PaymentMethod? PaymentMethod { get; init; }
+    public decimal CostTotal { get; init; }
+    public decimal GrossProfit { get; init; }
     public PaymentStatus PaymentStatus { get; init; }
     public InvoiceStatus Status { get; init; }
     public string? Notes { get; init; }
@@ -44,6 +49,9 @@ public sealed class SalesInvoiceItemData
     public decimal QuantityBaseUnit { get; init; }
     public decimal UnitPrice { get; init; }
     public decimal LineTotal { get; init; }
+    public decimal UnitCostBaseAtSale { get; init; }
+    public decimal CostTotal { get; init; }
+    public decimal GrossProfit { get; init; }
     public bool IsSerialTracked { get; init; }
     public List<string> SerialNumbers { get; init; } = new();
 }
@@ -92,4 +100,12 @@ public sealed class PostSalesRequest
     public decimal PaidAmount { get; init; }
     public Guid? CashboxId { get; init; }
     public PaymentMethod PaymentMethod { get; init; } = PaymentMethod.Cash;
+    /// <summary>
+    /// Used only when the invoice has a remaining balance and no existing customer
+    /// was selected. The service reuses an existing phone/name match or creates a
+    /// debtor customer inside the same posting transaction.
+    /// </summary>
+    public string? CreditCustomerName { get; init; }
+    public string? CreditCustomerPhone { get; init; }
+    public string? CreditCustomerAddress { get; init; }
 }

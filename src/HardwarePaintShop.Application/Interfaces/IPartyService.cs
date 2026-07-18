@@ -21,6 +21,12 @@ public interface IPartyService
         bool isActive,
         CancellationToken cancellationToken = default);
 
+    Task<CustomerStatementData> GetCustomerStatementAsync(
+        Guid customerId,
+        DateTime from,
+        DateTime to,
+        CancellationToken cancellationToken = default);
+
     Task<List<SupplierListItem>> SearchSuppliersAsync(
         PartySearchCriteria criteria,
         CancellationToken cancellationToken = default);

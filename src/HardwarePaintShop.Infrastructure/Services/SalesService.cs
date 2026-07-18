@@ -90,12 +90,23 @@ public sealed class SalesService : ISalesService
                 QuantityBaseUnit = itemGroup.Sum(i => i.QuantityBaseUnit),
                 UnitPrice = itemGroup.Key.UnitPrice,
                 LineTotal = itemGroup.Sum(i => i.LineTotal),
+                UnitCostBaseAtSale = itemGroup.Sum(i => i.QuantityBaseUnit) == 0
+                    ? 0
+                    : itemGroup.Sum(i => i.CostTotal) / itemGroup.Sum(i => i.QuantityBaseUnit),
+                CostTotal = itemGroup.Sum(i => i.CostTotal),
+                GrossProfit = itemGroup.Sum(i => i.GrossProfit),
                 IsSerialTracked = itemGroup.Key.IsSerialTracked,
                 SerialNumbers = itemGroup.Where(i => i.SerialNumber != null)
                     .Select(i => i.SerialNumber!).OrderBy(x => x).ToList()
             })
             .OrderBy(i => i.ProductName)
             .ToList();
+
+        var paymentMethod = await db.InvoicePayments.AsNoTracking()
+            .Where(p => p.SalesInvoiceId == invoiceId)
+            .OrderBy(p => p.PaymentDate)
+            .Select(p => (PaymentMethod?)p.PaymentMethod)
+            .FirstOrDefaultAsync(cancellationToken);
 
         return new SalesInvoiceDetails
         {
@@ -110,6 +121,11 @@ public sealed class SalesService : ISalesService
             TotalAmount = invoice.TotalAmount,
             PaidAmount = invoice.PaidAmount,
             RemainingAmount = invoice.RemainingAmount,
+            CustomerBalanceBefore = invoice.CustomerBalanceBefore,
+            CustomerBalanceAfter = invoice.CustomerBalanceAfter,
+            PaymentMethod = paymentMethod,
+            CostTotal = groupedItems.Sum(i => i.CostTotal),
+            GrossProfit = groupedItems.Sum(i => i.GrossProfit),
             PaymentStatus = invoice.PaymentStatus,
             Status = invoice.Status,
             Notes = invoice.Notes,
@@ -282,11 +298,19 @@ public sealed class SalesService : ISalesService
         if (request.PaidAmount > invoice.TotalAmount)
             throw new InvalidOperationException("المدفوع أكبر من إجمالي الفاتورة.");
         var remaining = invoice.TotalAmount - request.PaidAmount;
+        var autoCreatedCreditCustomer = false;
         if (remaining > 0 && invoice.Customer is null)
-            throw new InvalidOperationException("البيع الآجل أو الجزئي يتطلب اختيار عميل.");
+        {
+            invoice.Customer = await ResolveOrCreateCreditCustomerAsync(
+                db, request, invoice.TotalAmount, remaining, cancellationToken);
+            invoice.CustomerId = invoice.Customer.Id;
+            autoCreatedCreditCustomer = db.Entry(invoice.Customer).State == EntityState.Added;
+        }
         if (invoice.Customer is not null && remaining > 0)
         {
             var projectedBalance = invoice.Customer.CurrentBalance + remaining;
+            if (autoCreatedCreditCustomer && invoice.Customer.CreditLimit < projectedBalance)
+                invoice.Customer.CreditLimit = projectedBalance;
             if (invoice.Customer.CreditLimit <= 0 || projectedBalance > invoice.Customer.CreditLimit)
                 throw new InvalidOperationException("الرصيد الجديد يتجاوز حد ائتمان العميل.");
         }
@@ -320,6 +344,28 @@ public sealed class SalesService : ISalesService
             throw new InvalidOperationException("حجز سيريالات الفاتورة غير مكتمل. افتح المسودة واحفظها مرة أخرى.");
 
         var now = DateTime.UtcNow;
+        var productCosts = await db.ProductCosts
+            .Where(c => productIds.Contains(c.ProductId))
+            .ToDictionaryAsync(c => c.ProductId, c => c.AverageCostBaseUnit, cancellationToken);
+        var invoiceItems = invoice.Items.OrderBy(i => i.CreatedAt).ThenBy(i => i.Id).ToList();
+        var allocatedDiscount = 0m;
+        for (var index = 0; index < invoiceItems.Count; index++)
+        {
+            var item = invoiceItems[index];
+            var remainingDiscount = Math.Max(0, invoice.DiscountAmount - allocatedDiscount);
+            var lineDiscount = index == invoiceItems.Count - 1
+                ? remainingDiscount
+                : Math.Min(remainingDiscount, RoundMoney(invoice.Subtotal == 0
+                    ? 0
+                    : invoice.DiscountAmount * item.LineTotal / invoice.Subtotal));
+            lineDiscount = Math.Max(0, lineDiscount);
+            allocatedDiscount += lineDiscount;
+            item.DiscountAmount = lineDiscount;
+            item.UnitCostBaseAtSale = RoundMoney(productCosts.GetValueOrDefault(item.ProductId));
+            item.CostTotal = RoundMoney(item.QuantityBaseUnit * item.UnitCostBaseAtSale);
+            item.GrossProfit = RoundMoney(item.LineTotal - item.DiscountAmount - item.CostTotal);
+        }
+
         foreach (var item in invoice.Items)
         {
             await db.StockMovements.AddAsync(new StockMovement
@@ -333,6 +379,7 @@ public sealed class SalesService : ISalesService
 
         if (invoice.Customer is not null)
         {
+            invoice.CustomerBalanceBefore = invoice.Customer.CurrentBalance;
             await db.CustomerTransactions.AddAsync(new CustomerTransaction
             {
                 Id = Guid.NewGuid(), CustomerId = invoice.Customer.Id,
@@ -352,6 +399,12 @@ public sealed class SalesService : ISalesService
             }
             invoice.Customer.CurrentBalance += remaining;
             invoice.Customer.UpdatedAt = now;
+            invoice.CustomerBalanceAfter = invoice.Customer.CurrentBalance;
+        }
+        else
+        {
+            invoice.CustomerBalanceBefore = 0;
+            invoice.CustomerBalanceAfter = 0;
         }
 
         if (request.PaidAmount > 0 && cashbox is not null)
@@ -549,6 +602,54 @@ public sealed class SalesService : ISalesService
 
     private static decimal RoundMoney(decimal value)
         => decimal.Round(value, 2, MidpointRounding.AwayFromZero);
+
+    private async Task<Customer> ResolveOrCreateCreditCustomerAsync(
+        AppDbContext db,
+        PostSalesRequest request,
+        decimal invoiceTotal,
+        decimal remaining,
+        CancellationToken cancellationToken)
+    {
+        var name = Normalize(request.CreditCustomerName);
+        var phone = Normalize(request.CreditCustomerPhone);
+        var address = Normalize(request.CreditCustomerAddress);
+        if (name is null)
+            throw new InvalidOperationException("يوجد باقي على الفاتورة. أدخل اسم العميل الآجل أو اختر عميلًا مسجلًا.");
+
+        Customer? customer = null;
+        if (phone is not null)
+        {
+            customer = await db.Customers.FirstOrDefaultAsync(
+                c => c.IsActive && c.Phone == phone,
+                cancellationToken);
+        }
+
+        if (customer is null && phone is null)
+        {
+            customer = await db.Customers.FirstOrDefaultAsync(
+                c => c.IsActive && c.Name.ToLower() == name.ToLower(),
+                cancellationToken);
+        }
+        if (customer is not null)
+            return customer;
+
+        customer = new Customer
+        {
+            Id = Guid.NewGuid(),
+            Name = name,
+            Phone = phone,
+            Address = address,
+            CustomerType = "آجل",
+            CreditLimit = Math.Max(invoiceTotal, remaining),
+            CurrentBalance = 0,
+            Notes = "أُنشئ تلقائيًا من فاتورة بيع آجلة",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+        await db.Customers.AddAsync(customer, cancellationToken);
+        return customer;
+    }
 
     private sealed record PreparedSalesLine(
         Guid ProductId,

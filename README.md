@@ -14,14 +14,14 @@
 - Categories, units, price groups, expense categories, products, barcodes, images, unit conversions, prices, costs, and serial tracking.
 - Customers and suppliers with credit/payable balances and controlled soft deactivation.
 - Smart purchase invoices: draft, posting, landed cost, weighted cost, stock-in, serials, supplier ledger, payments, and controlled void.
-- Barcode-first Sales POS: cash/credit/partial payments, price groups, credit limits, stock-out, serial reservation, and negative-stock prevention.
+- Barcode-first Sales POS: cash/credit/partial payments, editable actual price, minimum-price enforcement, automatic debtor-customer creation, stock-out, serial reservation, and negative-stock prevention.
 - Sales and purchase returns linked to an original posted invoice, with quantity limits, serial validation, stock reversal, balance reversal, or cash refund.
 - Multiple cashboxes, expenses, customer collections, supplier payments, owner deposits/withdrawals, and cash transfers.
 - Live stock balances, stock card, physical count, transactional inventory adjustment, and historical count log.
 - Low-stock, negative-stock, and overdue-invoice alerts.
-- Financial dashboard and reports for sales, purchases, returns, expenses, estimated profit, stock value, customer debt, supplier debt, daily sales, and top products.
-- UTF-8 CSV export, report printing, and 58/80 mm sales receipt printing.
-- Shop/printer/backup settings stored in the database.
+- Financial dashboard and reports for sales, purchases, returns, expenses, historical captured cost, net profit, stock value, customer debt, supplier debt, daily sales, and product profitability.
+- Customer account statements plus detailed A4/58/80 mm invoices that can be printed or saved through Microsoft Print to PDF.
+- Shop, legal invoice fields, logo, paper size, footer, printer, and backup settings stored in the database.
 - PostgreSQL custom-format backup, automatic daily backup, retention cleanup, backup history, safety backup before restore, and restore.
 - First-run/recovery database connection screen. The app does not open the login screen when database initialization fails.
 - 30-day trial and RSA-signed offline licenses bound to the Windows machine.
@@ -29,7 +29,7 @@
 - Authenticated local API with device sessions and permission checks for products, customers, collections, stock adjustments, alerts, and synchronization.
 - Arabic Flutter mobile client with dashboard, barcode scanning, product/customer workflows, alerts, camera product images, and an offline operation queue.
 
-No schema migration is added by RC1: the existing model already contains returns, inventory counts, alerts, backup logs, and settings. New permission rows and Owner assignments are seeded automatically on startup.
+The sales profitability migration stores cost/profit and customer-balance snapshots on posted invoices. Migrations, standard units, the default retail price group, new permissions, and Owner assignments are applied or seeded automatically on startup.
 
 ## Build and test on Windows
 

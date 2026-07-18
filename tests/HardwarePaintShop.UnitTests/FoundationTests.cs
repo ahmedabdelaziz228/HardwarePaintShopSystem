@@ -130,6 +130,7 @@ public class FoundationTests
         provider.GetRequiredService<ProductsViewModel>().Should().NotBeNull();
         provider.GetRequiredService<PriceInquiryViewModel>().Should().NotBeNull();
         provider.GetRequiredService<CustomersViewModel>().Should().NotBeNull();
+        provider.GetRequiredService<CustomerStatementViewModel>().Should().NotBeNull();
         provider.GetRequiredService<SuppliersViewModel>().Should().NotBeNull();
         provider.GetRequiredService<CashboxesViewModel>().Should().NotBeNull();
         provider.GetRequiredService<PurchaseInvoicesViewModel>().Should().NotBeNull();

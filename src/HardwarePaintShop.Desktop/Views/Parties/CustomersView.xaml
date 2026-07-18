@@ -90,10 +90,14 @@
                                     </Style>
                                 </DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
-                            <DataGridTemplateColumn Header="" Width="135">
+                            <DataGridTemplateColumn Header="" Width="220">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <StackPanel Orientation="Horizontal">
+                                            <Button Content="كشف حساب" Padding="8,4" Margin="0,0,4,0"
+                                                    Style="{StaticResource PrimaryButtonStyle}"
+                                                    Command="{Binding DataContext.OpenStatementCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"/>
                                             <Button Content="تعديل" Padding="8,4" Margin="0,0,4,0"
                                                     Style="{StaticResource SecondaryButtonStyle}"
                                                     Command="{Binding DataContext.EditCustomerCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"

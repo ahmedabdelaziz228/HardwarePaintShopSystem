@@ -123,6 +123,7 @@
                             <DataGridTextColumn Header="المتاح" Binding="{Binding StockStatus}" IsReadOnly="True" Width="90"/>
                             <DataGridTextColumn Header="الكمية" Binding="{Binding Quantity, UpdateSourceTrigger=PropertyChanged}" Width="70"/>
                             <DataGridTextColumn Header="السعر" Binding="{Binding UnitPrice, UpdateSourceTrigger=PropertyChanged}" Width="85"/>
+                            <DataGridTextColumn Header="أقل سعر" Binding="{Binding MinSalePrice, StringFormat=N2}" IsReadOnly="True" Width="75"/>
                             <DataGridTextColumn Header="الإجمالي" Binding="{Binding LineTotal, StringFormat=N2}" IsReadOnly="True" Width="90"/>
                             <DataGridTemplateColumn Header="السيريالات" Width="145">
                                 <DataGridTemplateColumn.CellTemplate>
@@ -235,6 +236,32 @@
                             </Grid>
                         </Border>
 
+                        <Border Background="#EFF6FF" BorderBrush="#93C5FD" BorderThickness="1"
+                                CornerRadius="8" Padding="11" Margin="0,0,0,9"
+                                Visibility="{Binding NeedsCreditCustomer, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <StackPanel>
+                                <TextBlock Text="بيانات العميل الآجل" FontWeight="Bold" Foreground="#1D4ED8"/>
+                                <TextBlock Text="يوجد باقي؛ سيُنشأ العميل تلقائيًا ويظهر في كشف الحساب."
+                                           FontSize="11" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,2,0,8"/>
+                                <TextBlock Text="اسم العميل *" Style="{StaticResource LabelStyle}"/>
+                                <TextBox Text="{Binding CreditCustomerName, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource AppTextBoxStyle}" Margin="0,3,0,7" IsEnabled="{Binding CanEditCurrent}"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="7"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="الهاتف" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding CreditCustomerPhone, UpdateSourceTrigger=PropertyChanged}"
+                                                 Style="{StaticResource AppTextBoxStyle}" Margin="0,3,0,0" FlowDirection="LeftToRight"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="العنوان" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding CreditCustomerAddress, UpdateSourceTrigger=PropertyChanged}"
+                                                 Style="{StaticResource AppTextBoxStyle}" Margin="0,3,0,0"/>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
                         <TextBlock Text="الخزينة" Style="{StaticResource LabelStyle}"/>
                         <ComboBox ItemsSource="{Binding Cashboxes}" SelectedItem="{Binding SelectedCashbox}"
                                   DisplayMemberPath="Name" Style="{StaticResource AppComboBoxStyle}" Margin="0,4,0,9"/>
@@ -255,7 +282,7 @@
                             <Button Grid.Column="2" Content="إلغاء المسودة" Command="{Binding VoidDraftCommand}"
                                     Style="{StaticResource DangerButtonStyle}"/>
                         </Grid>
-                        <Button Content="طباعة الفاتورة" Command="{Binding PrintReceiptCommand}"
+                        <Button Content="طباعة / حفظ الفاتورة PDF" Command="{Binding PrintInvoiceCommand}"
                                 Style="{StaticResource SecondaryButtonStyle}" Margin="0,7,0,0"/>
                     </StackPanel>
                 </ScrollViewer>

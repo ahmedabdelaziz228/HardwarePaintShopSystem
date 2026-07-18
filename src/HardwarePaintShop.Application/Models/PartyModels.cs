@@ -41,6 +41,29 @@ public sealed class CustomerSaveRequest
     public bool IsActive { get; init; } = true;
 }
 
+public sealed class CustomerStatementData
+{
+    public Guid CustomerId { get; init; }
+    public string CustomerName { get; init; } = string.Empty;
+    public string? Phone { get; init; }
+    public string? Address { get; init; }
+    public DateTime From { get; init; }
+    public DateTime To { get; init; }
+    public decimal OpeningBalance { get; init; }
+    public decimal ClosingBalance { get; init; }
+    public List<CustomerStatementLine> Lines { get; init; } = new();
+}
+
+public sealed record CustomerStatementLine(
+    Guid Id,
+    DateTime Date,
+    string TransactionType,
+    string Description,
+    string? ReferenceNo,
+    decimal Debit,
+    decimal Credit,
+    decimal RunningBalance);
+
 public sealed record SupplierListItem(
     Guid Id,
     string Name,

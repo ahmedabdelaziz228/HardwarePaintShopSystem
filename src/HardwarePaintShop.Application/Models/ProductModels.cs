@@ -31,6 +31,9 @@ public sealed class ProductDetails
     public bool IsSerialTracked { get; init; }
     public bool IsActive { get; init; }
     public string? Notes { get; init; }
+    public decimal StockBaseQuantity { get; init; }
+    public decimal LastPurchasePriceBaseUnit { get; init; }
+    public decimal AverageCostBaseUnit { get; init; }
     public List<ProductUnitData> Units { get; init; } = new();
     public List<ProductPriceData> Prices { get; init; } = new();
     public List<ProductBarcodeData> Barcodes { get; init; } = new();

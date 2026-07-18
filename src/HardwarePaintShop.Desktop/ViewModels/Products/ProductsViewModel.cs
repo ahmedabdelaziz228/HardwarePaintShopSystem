@@ -39,6 +39,11 @@ public partial class ProductsViewModel : BaseViewModel
     [ObservableProperty] private Guid? _formMainSupplierId;
     [ObservableProperty] private Guid? _formBaseUnitId;
     [ObservableProperty] private decimal _formMinStockBaseQuantity;
+    [ObservableProperty] private decimal _formOpeningQuantityBase;
+    [ObservableProperty] private decimal _formOpeningCostBaseUnit;
+    [ObservableProperty] private decimal _formCurrentStockBase;
+    [ObservableProperty] private decimal _formLastPurchaseCostBase;
+    [ObservableProperty] private decimal _formAverageCostBase;
     [ObservableProperty] private bool _formIsSerialTracked;
     [ObservableProperty] private bool _formIsActive = true;
     [ObservableProperty] private string _formImagePath = string.Empty;
@@ -52,6 +57,7 @@ public partial class ProductsViewModel : BaseViewModel
     public bool CanCreate { get; }
     public bool CanUpdate { get; }
     public bool CanDeactivate { get; }
+    public bool IsNewProduct => !IsEditing;
 
     public ProductsViewModel(
         IProductService productService,
@@ -91,6 +97,9 @@ public partial class ProductsViewModel : BaseViewModel
             baseRow.ConversionFactorToBase = 1;
         }
     }
+
+    partial void OnIsEditingChanged(bool value)
+        => OnPropertyChanged(nameof(IsNewProduct));
 
     [RelayCommand]
     private async Task InitializeAsync()
@@ -155,6 +164,11 @@ public partial class ProductsViewModel : BaseViewModel
         FormCategoryId = null;
         FormMainSupplierId = null;
         FormMinStockBaseQuantity = 0;
+        FormOpeningQuantityBase = 0;
+        FormOpeningCostBaseUnit = 0;
+        FormCurrentStockBase = 0;
+        FormLastPurchaseCostBase = 0;
+        FormAverageCostBase = 0;
         FormIsSerialTracked = false;
         FormIsActive = true;
         FormImagePath = string.Empty;
@@ -190,6 +204,11 @@ public partial class ProductsViewModel : BaseViewModel
             FormCategoryId = product.CategoryId;
             FormMainSupplierId = product.MainSupplierId;
             FormMinStockBaseQuantity = product.MinStockBaseQuantity;
+            FormOpeningQuantityBase = 0;
+            FormOpeningCostBaseUnit = 0;
+            FormCurrentStockBase = product.StockBaseQuantity;
+            FormLastPurchaseCostBase = product.LastPurchasePriceBaseUnit;
+            FormAverageCostBase = product.AverageCostBaseUnit;
             FormIsSerialTracked = product.IsSerialTracked;
             FormIsActive = product.IsActive;
             FormImagePath = product.ImagePath ?? string.Empty;
@@ -271,6 +290,8 @@ public partial class ProductsViewModel : BaseViewModel
                 MainSupplierId = FormMainSupplierId,
                 BaseUnitId = FormBaseUnitId.Value,
                 MinStockBaseQuantity = FormMinStockBaseQuantity,
+                OpeningQuantityBase = IsEditing ? 0 : FormOpeningQuantityBase,
+                OpeningCostBaseUnit = IsEditing ? 0 : FormOpeningCostBaseUnit,
                 IsSerialTracked = FormIsSerialTracked,
                 IsActive = FormIsActive,
                 ImagePath = FormImagePath,

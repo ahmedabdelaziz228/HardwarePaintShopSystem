@@ -5,10 +5,12 @@ using HardwarePaintShop.Application.Models;
 using HardwarePaintShop.Domain.Entities;
 using HardwarePaintShop.Domain.Enums;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace HardwarePaintShop.Desktop.ViewModels.Sales;
 
@@ -40,6 +42,9 @@ public partial class SalesPosViewModel : BaseViewModel
     [ObservableProperty] private DateTime? _dueDate;
     [ObservableProperty] private decimal _discountAmount;
     [ObservableProperty] private decimal _paidAmount;
+    [ObservableProperty] private string _creditCustomerName = string.Empty;
+    [ObservableProperty] private string _creditCustomerPhone = string.Empty;
+    [ObservableProperty] private string _creditCustomerAddress = string.Empty;
     [ObservableProperty] private string _notes = string.Empty;
     [ObservableProperty] private InvoiceStatus _currentStatus = InvoiceStatus.Draft;
     [ObservableProperty] private SalesPaymentMethodOption _selectedPaymentMethod;
@@ -68,6 +73,7 @@ public partial class SalesPosViewModel : BaseViewModel
     public decimal Subtotal => Items.Sum(i => i.LineTotal);
     public decimal TotalAmount => Math.Max(0, Subtotal - DiscountAmount);
     public decimal RemainingAmount => Math.Max(0, TotalAmount - PaidAmount);
+    public bool NeedsCreditCustomer => RemainingAmount > 0 && SelectedCustomer is null;
     public int CartLines => Items.Count;
 
     public SalesPosViewModel(
@@ -136,6 +142,9 @@ public partial class SalesPosViewModel : BaseViewModel
         DueDate = null;
         DiscountAmount = 0;
         PaidAmount = 0;
+        CreditCustomerName = string.Empty;
+        CreditCustomerPhone = string.Empty;
+        CreditCustomerAddress = string.Empty;
         Notes = string.Empty;
         Items = new ObservableCollection<SalesLineEditor>();
         CurrentStatus = InvoiceStatus.Draft;
@@ -148,6 +157,9 @@ public partial class SalesPosViewModel : BaseViewModel
     {
         SelectedCustomer = null;
         DueDate = null;
+        CreditCustomerName = string.Empty;
+        CreditCustomerPhone = string.Empty;
+        CreditCustomerAddress = string.Empty;
         OnPropertyChanged(nameof(CustomerDisplay));
     }
 
@@ -293,8 +305,13 @@ public partial class SalesPosViewModel : BaseViewModel
                 InvoiceId = id,
                 PaidAmount = PaidAmount,
                 CashboxId = PaidAmount > 0 ? SelectedCashbox?.Id : null,
-                PaymentMethod = SelectedPaymentMethod.Value
+                PaymentMethod = SelectedPaymentMethod.Value,
+                CreditCustomerName = CreditCustomerName,
+                CreditCustomerPhone = CreditCustomerPhone,
+                CreditCustomerAddress = CreditCustomerAddress
             });
+            Customers = new ObservableCollection<CustomerListItem>(
+                await _partyService.SearchCustomersAsync(new PartySearchCriteria()));
             await LoadInvoicesAsync();
             await OpenInvoiceAsync(Invoices.FirstOrDefault(i => i.Id == id));
             ShowSuccess("تم ترحيل البيع وتحديث المخزون والخزينة وحساب العميل ✓");
@@ -322,7 +339,7 @@ public partial class SalesPosViewModel : BaseViewModel
     }
 
     [RelayCommand]
-    private async Task PrintReceiptAsync()
+    private async Task PrintInvoiceAsync()
     {
         if (!CanPrint) { ShowError("ليس لديك صلاحية طباعة الفواتير."); return; }
         if (!EditingId.HasValue || CurrentStatus == InvoiceStatus.Draft)
@@ -331,58 +348,165 @@ public partial class SalesPosViewModel : BaseViewModel
         }
         try
         {
+            var details = await _salesService.GetAsync(EditingId.Value);
             var settings = await _settingsService.GetSettingsAsync();
             var dialog = new PrintDialog();
             if (dialog.ShowDialog() != true) return;
-            var width = settings.ThermalPrinterWidth / 25.4 * 96.0;
-            var document = BuildReceipt(settings, width);
+            var document = BuildInvoice(settings, details);
+            if (settings.InvoicePaperSize == "A4")
+            {
+                document.PageWidth = Math.Max(500, dialog.PrintableAreaWidth);
+                document.PageHeight = Math.Max(700, dialog.PrintableAreaHeight);
+                document.PagePadding = new Thickness(38);
+                document.ColumnWidth = Math.Max(430, document.PageWidth - 76);
+            }
+            else
+            {
+                var millimeters = settings.InvoicePaperSize == "58mm" ? 58 : 80;
+                var width = millimeters / 25.4 * 96.0;
+                document.PageWidth = width;
+                document.PagePadding = new Thickness(7);
+                document.ColumnWidth = Math.Max(120, width - 14);
+                document.FontSize = millimeters == 58 ? 8 : 9;
+            }
             dialog.PrintDocument(((IDocumentPaginatorSource)document).DocumentPaginator, $"فاتورة {InvoiceNo}");
-            ShowSuccess("تم إرسال الفاتورة إلى الطابعة.");
+            ShowSuccess("تم إرسال الفاتورة للطباعة. اختر Microsoft Print to PDF لحفظها PDF.");
         }
         catch (Exception ex) { ShowError(ex.Message); }
     }
 
-    private FlowDocument BuildReceipt(ShopSettings settings, double width)
+    private static FlowDocument BuildInvoice(ShopSettings settings, SalesInvoiceDetails details)
     {
+        var currency = settings.CurrencySymbol;
         var document = new FlowDocument
         {
-            FlowDirection = FlowDirection.RightToLeft, FontFamily = new FontFamily("Segoe UI"),
-            FontSize = settings.ThermalPrinterWidth == 58 ? 8.5 : 10,
-            PageWidth = width, PagePadding = new Thickness(8), ColumnWidth = Math.Max(120, width - 16)
+            FlowDirection = FlowDirection.RightToLeft,
+            FontFamily = new FontFamily("Segoe UI"),
+            FontSize = 10.5
         };
-        document.Blocks.Add(new Paragraph(new Run(settings.ShopName)) { TextAlignment = TextAlignment.Center, FontSize = 16, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 2) });
+
+        if (!string.IsNullOrWhiteSpace(settings.LogoPath) && File.Exists(settings.LogoPath))
+        {
+            var logo = new Image
+            {
+                Source = new BitmapImage(new Uri(settings.LogoPath, UriKind.Absolute)),
+                Width = 82,
+                Height = 64,
+                Stretch = Stretch.Uniform
+            };
+            document.Blocks.Add(new BlockUIContainer(logo) { TextAlignment = TextAlignment.Center });
+        }
+
+        document.Blocks.Add(new Paragraph(new Run(settings.ShopName))
+        {
+            TextAlignment = TextAlignment.Center,
+            FontSize = 20,
+            FontWeight = FontWeights.Bold,
+            Margin = new Thickness(0, 0, 0, 2)
+        });
         if (!string.IsNullOrWhiteSpace(settings.ShopAddress)) document.Blocks.Add(Centered(settings.ShopAddress));
         if (!string.IsNullOrWhiteSpace(settings.ShopPhone)) document.Blocks.Add(Centered($"ت: {settings.ShopPhone}"));
         if (!string.IsNullOrWhiteSpace(settings.TaxNumber)) document.Blocks.Add(Centered($"الرقم الضريبي: {settings.TaxNumber}"));
-        document.Blocks.Add(Centered($"فاتورة بيع: {InvoiceNo}"));
-        document.Blocks.Add(Centered($"{InvoiceDate:dd/MM/yyyy}  {DateTime.Now:HH:mm}"));
-        document.Blocks.Add(new Paragraph(new Run($"العميل: {CustomerDisplay}")) { Margin = new Thickness(0, 4, 0, 4) });
+        if (!string.IsNullOrWhiteSpace(settings.CommercialRegistration))
+            document.Blocks.Add(Centered($"السجل التجاري: {settings.CommercialRegistration}"));
+        document.Blocks.Add(new Paragraph(new Run(settings.InvoiceTitle))
+        {
+            TextAlignment = TextAlignment.Center,
+            FontSize = 17,
+            FontWeight = FontWeights.Bold,
+            Foreground = new SolidColorBrush(Color.FromRgb(29, 78, 216)),
+            Margin = new Thickness(0, 9, 0, 4)
+        });
+
+        var meta = new Table { CellSpacing = 0, Margin = new Thickness(0, 0, 0, 10) };
+        meta.Columns.Add(new TableColumn { Width = new GridLength(1, GridUnitType.Star) });
+        meta.Columns.Add(new TableColumn { Width = new GridLength(1, GridUnitType.Star) });
+        var metaGroup = new TableRowGroup();
+        meta.RowGroups.Add(metaGroup);
+        AddInvoiceRow(metaGroup, false,
+            $"رقم الفاتورة: {details.InvoiceNo}",
+            $"التاريخ: {details.InvoiceDate.ToLocalTime():dd/MM/yyyy HH:mm}");
+        AddInvoiceRow(metaGroup, false,
+            $"العميل: {details.CustomerName}",
+            $"طريقة الدفع: {PaymentMethodName(details.PaymentMethod)}");
+        if (details.DueDate.HasValue)
+            AddInvoiceRow(metaGroup, false, $"الاستحقاق: {details.DueDate.Value.ToLocalTime():dd/MM/yyyy}", string.Empty);
+        document.Blocks.Add(meta);
+
         var table = new Table { CellSpacing = 0 };
-        table.Columns.Add(new TableColumn { Width = new GridLength(2, GridUnitType.Star) });
+        table.Columns.Add(new TableColumn { Width = new GridLength(2.4, GridUnitType.Star) });
+        table.Columns.Add(new TableColumn { Width = new GridLength(0.7, GridUnitType.Star) });
         table.Columns.Add(new TableColumn { Width = new GridLength(0.7, GridUnitType.Star) });
         table.Columns.Add(new TableColumn { Width = new GridLength(0.9, GridUnitType.Star) });
+        table.Columns.Add(new TableColumn { Width = new GridLength(1, GridUnitType.Star) });
         var group = new TableRowGroup(); table.RowGroups.Add(group);
-        AddReceiptRow(group, "الصنف", "الكمية", "الإجمالي", true);
-        foreach (var item in Items)
-            AddReceiptRow(group, item.ProductName, $"{item.Quantity:0.###}", $"{item.LineTotal:N2}", false);
+        AddInvoiceRow(group, true, "الصنف", "الوحدة", "الكمية", "سعر الوحدة", "الإجمالي");
+        foreach (var item in details.Items)
+        {
+            var product = string.IsNullOrWhiteSpace(item.ProductCode)
+                ? item.ProductName
+                : $"{item.ProductName}\n{item.ProductCode}";
+            AddInvoiceRow(group, false, product, item.UnitName,
+                item.Quantity.ToString("0.###"), item.UnitPrice.ToString("N2"), item.LineTotal.ToString("N2"));
+            if (item.SerialNumbers.Count > 0)
+                AddInvoiceRow(group, false, $"السيريالات: {string.Join("، ", item.SerialNumbers)}", string.Empty, string.Empty, string.Empty, string.Empty);
+        }
         document.Blocks.Add(table);
-        document.Blocks.Add(new Paragraph(new Run($"الإجمالي: {Subtotal:N2} ج.م")) { FontWeight = FontWeights.Bold, Margin = new Thickness(0, 6, 0, 0) });
-        if (DiscountAmount > 0) document.Blocks.Add(new Paragraph(new Run($"الخصم: {DiscountAmount:N2} ج.م")) { Margin = new Thickness(0) });
-        document.Blocks.Add(new Paragraph(new Run($"الصافي: {TotalAmount:N2} ج.م")) { FontSize = 14, FontWeight = FontWeights.Bold, Margin = new Thickness(0) });
-        document.Blocks.Add(new Paragraph(new Run($"المدفوع: {PaidAmount:N2} — المتبقي: {RemainingAmount:N2}")) { Margin = new Thickness(0) });
-        document.Blocks.Add(Centered("شكرًا لزيارتكم"));
+
+        var totals = new Table { CellSpacing = 0, Margin = new Thickness(0, 10, 0, 6) };
+        totals.Columns.Add(new TableColumn { Width = new GridLength(2, GridUnitType.Star) });
+        totals.Columns.Add(new TableColumn { Width = new GridLength(1, GridUnitType.Star) });
+        var totalsGroup = new TableRowGroup(); totals.RowGroups.Add(totalsGroup);
+        AddInvoiceRow(totalsGroup, false, "الإجمالي قبل الخصم", $"{details.Subtotal:N2} {currency}");
+        AddInvoiceRow(totalsGroup, false, "الخصم", $"{details.DiscountAmount:N2} {currency}");
+        AddInvoiceRow(totalsGroup, true, "صافي الفاتورة", $"{details.TotalAmount:N2} {currency}");
+        AddInvoiceRow(totalsGroup, false, "المدفوع", $"{details.PaidAmount:N2} {currency}");
+        AddInvoiceRow(totalsGroup, true, "باقي الفاتورة", $"{details.RemainingAmount:N2} {currency}");
+        document.Blocks.Add(totals);
+
+        if (details.CustomerId.HasValue)
+        {
+            document.Blocks.Add(new Paragraph(new Run(
+                $"حساب العميل: رصيد سابق {details.CustomerBalanceBefore:N2} {currency}  |  " +
+                $"الرصيد بعد الفاتورة {details.CustomerBalanceAfter:N2} {currency}"))
+            {
+                Background = new SolidColorBrush(Color.FromRgb(239, 246, 255)),
+                Padding = new Thickness(8),
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(0, 5, 0, 5)
+            });
+        }
+        if (!string.IsNullOrWhiteSpace(details.Notes))
+            document.Blocks.Add(new Paragraph(new Run($"ملاحظات: {details.Notes}")) { Margin = new Thickness(0, 5, 0, 5) });
+        if (!string.IsNullOrWhiteSpace(settings.InvoiceFooter))
+            document.Blocks.Add(Centered(settings.InvoiceFooter));
         return document;
     }
 
     private static Paragraph Centered(string text) => new(new Run(text)) { TextAlignment = TextAlignment.Center, Margin = new Thickness(0) };
-    private static void AddReceiptRow(TableRowGroup group, string first, string second, string third, bool header)
+    private static void AddInvoiceRow(TableRowGroup group, bool header, params string[] values)
     {
-        var row = new TableRow { FontWeight = header ? FontWeights.Bold : FontWeights.Normal };
-        foreach (var value in new[] { first, second, third })
-            row.Cells.Add(new TableCell(new Paragraph(new Run(value)) { Margin = new Thickness(1) })
-            { BorderBrush = Brushes.LightGray, BorderThickness = new Thickness(0, 0, 0, 0.5), Padding = new Thickness(2) });
+        var row = new TableRow
+        {
+            FontWeight = header ? FontWeights.Bold : FontWeights.Normal,
+            Background = header ? new SolidColorBrush(Color.FromRgb(239, 246, 255)) : Brushes.Transparent
+        };
+        foreach (var value in values)
+            row.Cells.Add(new TableCell(new Paragraph(new Run(value)) { Margin = new Thickness(0) })
+            { BorderBrush = Brushes.LightGray, BorderThickness = new Thickness(0.5), Padding = new Thickness(5) });
         group.Rows.Add(row);
     }
+
+    private static string PaymentMethodName(PaymentMethod? method) => method switch
+    {
+        PaymentMethod.Cash => "نقدي",
+        PaymentMethod.Card => "بطاقة",
+        PaymentMethod.BankTransfer => "تحويل بنكي",
+        PaymentMethod.MobileWallet => "محفظة إلكترونية",
+        PaymentMethod.InstaPay => "InstaPay",
+        PaymentMethod.Other => "أخرى",
+        _ => "آجل دون دفعة"
+    };
 
     private SalesDraftRequest BuildDraftRequest() => new()
     {
@@ -406,6 +530,7 @@ public partial class SalesPosViewModel : BaseViewModel
     partial void OnSelectedCustomerChanged(CustomerListItem? value)
     {
         OnPropertyChanged(nameof(CustomerDisplay));
+        OnPropertyChanged(nameof(NeedsCreditCustomer));
         if (value is null)
             DueDate = null;
         else
@@ -436,6 +561,7 @@ public partial class SalesPosViewModel : BaseViewModel
         OnPropertyChanged(nameof(Subtotal));
         OnPropertyChanged(nameof(TotalAmount));
         OnPropertyChanged(nameof(RemainingAmount));
+        OnPropertyChanged(nameof(NeedsCreditCustomer));
         OnPropertyChanged(nameof(CartLines));
     }
 
@@ -468,7 +594,9 @@ public partial class SalesLineEditor : ObservableObject
 
     public decimal QuantityBaseUnit => Quantity * ConversionFactorToBase;
     public decimal LineTotal => Quantity * UnitPrice;
-    public string StockStatus => AvailableBaseQuantity == 0 ? "—" : $"{AvailableBaseQuantity:0.###} أساسي";
+    public string StockStatus => AvailableBaseQuantity == 0
+        ? "—"
+        : $"{AvailableBaseQuantity / ConversionFactorToBase:0.###} {UnitName}";
 
     public SalesLineEditor(
         SalesProductOption product,

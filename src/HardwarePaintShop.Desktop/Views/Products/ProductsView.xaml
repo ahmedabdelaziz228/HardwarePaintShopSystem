@@ -215,12 +215,63 @@
                             </ScrollViewer>
                         </TabItem>
 
+                        <TabItem Header="المخزون والتكلفة">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <StackPanel Margin="14">
+                                    <Border Background="#EFF6FF" BorderBrush="#BFDBFE" BorderThickness="1"
+                                            CornerRadius="8" Padding="12" Margin="0,0,0,12">
+                                        <TextBlock TextWrapping="Wrap" Foreground="#1D4ED8"
+                                                   Text="المخزون يُحفظ دائمًا بالوحدة الأساسية. مثال: الفحم وحدته الأساسية كيلو، وإذا كانت الشكارة 25 كيلو فشراء 25 شكارة يضيف 625 كيلو. واللفة 50 متر تُباع بالمتر ويُخصم كل متر تلقائيًا."/>
+                                    </Border>
+
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="الرصيد الافتتاحي بالوحدة الأساسية" Style="{StaticResource LabelStyle}"/>
+                                            <TextBox Text="{Binding FormOpeningQuantityBase, UpdateSourceTrigger=LostFocus}"
+                                                     IsEnabled="{Binding IsNewProduct}" Style="{StaticResource AppTextBoxStyle}" Margin="0,4,0,10"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="تكلفة شراء الوحدة الأساسية عند الافتتاح" Style="{StaticResource LabelStyle}"/>
+                                            <TextBox Text="{Binding FormOpeningCostBaseUnit, UpdateSourceTrigger=LostFocus}"
+                                                     IsEnabled="{Binding IsNewProduct}" Style="{StaticResource AppTextBoxStyle}" Margin="0,4,0,10"/>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <UniformGrid Columns="3" Margin="0,4,0,12">
+                                        <Border Style="{StaticResource CardStyle}" Padding="12" Margin="4">
+                                            <StackPanel><TextBlock Text="الرصيد الحالي (أساسي)" Foreground="{StaticResource MutedBrush}"/>
+                                                <TextBlock Text="{Binding FormCurrentStockBase, StringFormat=N3}" FontSize="21" FontWeight="Bold"/></StackPanel>
+                                        </Border>
+                                        <Border Style="{StaticResource CardStyle}" Padding="12" Margin="4">
+                                            <StackPanel><TextBlock Text="آخر تكلفة شراء" Foreground="{StaticResource MutedBrush}"/>
+                                                <TextBlock Text="{Binding FormLastPurchaseCostBase, StringFormat='{}{0:N2} ج.م'}" FontSize="21" FontWeight="Bold"/></StackPanel>
+                                        </Border>
+                                        <Border Style="{StaticResource CardStyle}" Padding="12" Margin="4">
+                                            <StackPanel><TextBlock Text="متوسط التكلفة" Foreground="{StaticResource MutedBrush}"/>
+                                                <TextBlock Text="{Binding FormAverageCostBase, StringFormat='{}{0:N2} ج.م'}" FontSize="21" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/></StackPanel>
+                                        </Border>
+                                    </UniformGrid>
+
+                                    <Border Background="#F8FAFC" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                                            CornerRadius="8" Padding="12">
+                                        <StackPanel>
+                                            <TextBlock Text="طريقة الإعداد الصحيحة" FontWeight="Bold" Margin="0,0,0,6"/>
+                                            <TextBlock TextWrapping="Wrap" Text="• فحم: الوحدة الأساسية = كيلو، أضف وحدة شكارة بمعامل وزن الشكارة (مثلًا 25).&#x0a;• سلك: الوحدة الأساسية = متر، أضف وحدة لفة بمعامل 50.&#x0a;• سعر الشراء يتحدث من فواتير الشراء، ومتوسط التكلفة يُحفظ وقت كل بيع لحساب الربح الحقيقي."/>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </TabItem>
+
                         <TabItem Header="وحدات المنتج">
                             <DockPanel Margin="10">
                                 <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
                                     <Button Content="➕ إضافة وحدة" Command="{Binding AddUnitCommand}"
                                             Style="{StaticResource SecondaryButtonStyle}"/>
-                                    <TextBlock Text="  مثال: 1 كرتونة = 12 قطعة. الوحدة الأساسية معاملها دائمًا 1."
+                                    <TextBlock Text="  اربط كل وحدة مباشرة بالأساسية: شكارة=25 كيلو، لفة=50 متر. الأساسية معاملها 1."
                                                Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center"/>
                                 </StackPanel>
                                 <DataGrid ItemsSource="{Binding ProductUnits}" Style="{StaticResource AppDataGridStyle}">

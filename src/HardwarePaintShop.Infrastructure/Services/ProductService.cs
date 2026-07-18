@@ -78,6 +78,8 @@ public sealed class ProductService : IProductService
             .Include(p => p.ProductUnits).ThenInclude(pu => pu.Unit)
             .Include(p => p.ProductPrices).ThenInclude(pp => pp.ProductUnit)
             .Include(p => p.ProductBarcodes)
+            .Include(p => p.ProductCost)
+            .Include(p => p.StockMovements)
             .SingleOrDefaultAsync(p => p.Id == productId, cancellationToken)
             ?? throw new KeyNotFoundException("المنتج المطلوب غير موجود.");
 
@@ -94,6 +96,9 @@ public sealed class ProductService : IProductService
             IsSerialTracked = product.IsSerialTracked,
             IsActive = product.IsActive,
             Notes = product.Notes,
+            StockBaseQuantity = product.StockMovements.Sum(m => m.QuantityBaseUnit),
+            LastPurchasePriceBaseUnit = product.ProductCost?.LastPurchasePriceBaseUnit ?? 0,
+            AverageCostBaseUnit = product.ProductCost?.AverageCostBaseUnit ?? 0,
             Units = product.ProductUnits
                 .OrderByDescending(u => u.UnitId == product.BaseUnitId)
                 .ThenBy(u => u.Unit.Name)

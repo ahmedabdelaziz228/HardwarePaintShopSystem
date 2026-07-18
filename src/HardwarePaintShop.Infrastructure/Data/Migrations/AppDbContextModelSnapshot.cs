@@ -1250,6 +1250,14 @@ namespace HardwarePaintShop.Infrastructure.Data.Migrations
                     b.Property<Guid?>("CustomerId")
                         .HasColumnType("uuid");
 
+                    b.Property<decimal>("CustomerBalanceAfter")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("CustomerBalanceBefore")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<decimal>("DiscountAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
@@ -1318,7 +1326,15 @@ namespace HardwarePaintShop.Infrastructure.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<decimal>("CostTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<decimal>("DiscountAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("GrossProfit")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
@@ -1347,6 +1363,10 @@ namespace HardwarePaintShop.Infrastructure.Data.Migrations
                         .HasColumnType("text");
 
                     b.Property<decimal>("UnitPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("UnitCostBaseAtSale")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 

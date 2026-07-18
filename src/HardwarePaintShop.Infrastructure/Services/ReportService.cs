@@ -38,19 +38,83 @@ public sealed class ReportService : IReportService
         var cashOut = await db.CashMovements.Where(m => m.CreatedAt >= start && m.CreatedAt < end && m.Direction == CashDirection.Out)
             .SumAsync(m => (decimal?)m.Amount, cancellationToken) ?? 0;
 
-        var estimatedCost = await db.SalesInvoiceItems.AsNoTracking()
+        var capturedCost = await db.SalesInvoiceItems.AsNoTracking()
             .Where(i => i.SalesInvoice.InvoiceDate >= start && i.SalesInvoice.InvoiceDate < end &&
                 i.SalesInvoice.Status != InvoiceStatus.Draft && i.SalesInvoice.Status != InvoiceStatus.Voided)
-            .SumAsync(i => (decimal?)(i.QuantityBaseUnit * (i.Product.ProductCost != null ? i.Product.ProductCost.AverageCostBaseUnit : 0)), cancellationToken) ?? 0;
+            .SumAsync(i => (decimal?)i.CostTotal, cancellationToken) ?? 0;
+
+        var salesReturnLines = await db.ReturnItems.AsNoTracking()
+            .Where(i => i.Return.CreatedAt >= start && i.Return.CreatedAt < end &&
+                i.Return.Status == "active" && i.Return.ReturnType == ReturnType.SalesReturn &&
+                i.Return.OriginalSalesInvoiceId.HasValue)
+            .Select(i => new
+            {
+                InvoiceId = i.Return.OriginalSalesInvoiceId!.Value,
+                i.ProductId,
+                i.ProductUnitId,
+                i.UnitPrice,
+                i.QuantityBaseUnit,
+                i.Total
+            })
+            .ToListAsync(cancellationToken);
+        var returnInvoiceIds = salesReturnLines.Select(i => i.InvoiceId).Distinct().ToList();
+        var originalCostLines = returnInvoiceIds.Count == 0
+            ? new List<ReturnCostSource>()
+            : await db.SalesInvoiceItems.AsNoTracking()
+                .Where(i => returnInvoiceIds.Contains(i.SalesInvoiceId))
+                .Select(i => new ReturnCostSource(
+                    i.SalesInvoiceId,
+                    i.ProductId,
+                    i.ProductUnitId,
+                    i.UnitPrice,
+                    i.QuantityBaseUnit,
+                    i.CostTotal))
+                .ToListAsync(cancellationToken);
+        var costPerBase = originalCostLines
+            .GroupBy(i => (i.InvoiceId, i.ProductId, i.ProductUnitId, i.UnitPrice))
+            .ToDictionary(
+                g => g.Key,
+                g => g.Sum(i => i.QuantityBaseUnit) == 0
+                    ? 0
+                    : g.Sum(i => i.CostTotal) / g.Sum(i => i.QuantityBaseUnit));
+        var returnedCost = salesReturnLines.Sum(i =>
+            i.QuantityBaseUnit * costPerBase.GetValueOrDefault(
+                (i.InvoiceId, i.ProductId, i.ProductUnitId, i.UnitPrice)));
         var daily = await sales.GroupBy(i => i.InvoiceDate.Date).OrderBy(g => g.Key)
             .Select(g => new DailySalesReportItem(g.Key, g.Count(), g.Sum(i => i.TotalAmount),
                 g.Sum(i => i.PaidAmount), g.Sum(i => i.RemainingAmount))).ToListAsync(cancellationToken);
-        var top = await db.SalesInvoiceItems.AsNoTracking()
+        var topSales = await db.SalesInvoiceItems.AsNoTracking()
             .Where(i => i.SalesInvoice.InvoiceDate >= start && i.SalesInvoice.InvoiceDate < end &&
                 i.SalesInvoice.Status != InvoiceStatus.Draft && i.SalesInvoice.Status != InvoiceStatus.Voided)
             .GroupBy(i => new { i.ProductId, i.Product.Name }).Select(g => new TopProductReportItem(
-                g.Key.ProductId, g.Key.Name, g.Sum(i => i.QuantityBaseUnit), g.Sum(i => i.LineTotal)))
+                g.Key.ProductId, g.Key.Name, g.Sum(i => i.QuantityBaseUnit),
+                g.Sum(i => i.LineTotal - i.DiscountAmount), g.Sum(i => i.CostTotal), g.Sum(i => i.GrossProfit)))
             .OrderByDescending(i => i.Revenue).Take(50).ToListAsync(cancellationToken);
+        var returnedByProduct = salesReturnLines
+            .GroupBy(i => i.ProductId)
+            .ToDictionary(
+                g => g.Key,
+                g => new
+                {
+                    Quantity = g.Sum(i => i.QuantityBaseUnit),
+                    Revenue = g.Sum(i => i.Total),
+                    Cost = g.Sum(i => i.QuantityBaseUnit * costPerBase.GetValueOrDefault(
+                        (i.InvoiceId, i.ProductId, i.ProductUnitId, i.UnitPrice)))
+                });
+        var top = topSales.Select(item =>
+        {
+            var returned = returnedByProduct.GetValueOrDefault(item.ProductId);
+            var quantity = item.QuantityBase - (returned?.Quantity ?? 0);
+            var revenue = item.Revenue - (returned?.Revenue ?? 0);
+            var cost = item.Cost - (returned?.Cost ?? 0);
+            return item with
+            {
+                QuantityBase = quantity,
+                Revenue = revenue,
+                Cost = cost,
+                GrossProfit = revenue - cost
+            };
+        }).OrderByDescending(i => i.Revenue).ToList();
         var customers = await db.Customers.AsNoTracking().Where(c => c.CurrentBalance != 0)
             .OrderByDescending(c => c.CurrentBalance).Take(300)
             .Select(c => new PartyBalanceReportItem(c.Id, c.Name, c.Phone, c.CurrentBalance, c.CreditLimit))
@@ -69,9 +133,19 @@ public sealed class ReportService : IReportService
             Purchases = purchaseTotal, SalesReturns = salesReturn,
             PurchaseReturns = purchaseReturn, Expenses = expense,
             CollectedCash = cashIn, PaidCash = cashOut,
-            EstimatedCostOfSales = estimatedCost, CustomerDebt = customers.Sum(c => c.Balance),
+            SalesReturnCost = returnedCost,
+            EstimatedCostOfSales = capturedCost - returnedCost,
+            CustomerDebt = customers.Sum(c => c.Balance),
             SupplierDebt = suppliers.Sum(s => s.Balance), StockValue = stockValue,
             DailySales = daily, TopProducts = top, CustomerBalances = customers, SupplierBalances = suppliers
         };
     }
+
+    private sealed record ReturnCostSource(
+        Guid InvoiceId,
+        Guid ProductId,
+        Guid ProductUnitId,
+        decimal UnitPrice,
+        decimal QuantityBaseUnit,
+        decimal CostTotal);
 }

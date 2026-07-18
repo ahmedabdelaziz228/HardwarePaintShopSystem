@@ -19,6 +19,10 @@ public class SalesInvoice
     public decimal TotalAmount { get; set; }
     public decimal PaidAmount { get; set; }
     public decimal RemainingAmount { get; set; }
+    /// <summary>Customer ledger balance immediately before posting this invoice.</summary>
+    public decimal CustomerBalanceBefore { get; set; }
+    /// <summary>Customer ledger balance immediately after posting this invoice.</summary>
+    public decimal CustomerBalanceAfter { get; set; }
     public PaymentStatus PaymentStatus { get; set; } = PaymentStatus.Unpaid;
     public InvoiceStatus Status { get; set; } = InvoiceStatus.Active;
     public Guid? UserId { get; set; }
@@ -49,6 +53,15 @@ public class SalesInvoiceItem
     public decimal UnitPrice { get; set; }
     public decimal DiscountAmount { get; set; }
     public decimal LineTotal { get; set; }
+
+    /// <summary>Weighted-average cost per base unit captured when the sale is posted.</summary>
+    public decimal UnitCostBaseAtSale { get; set; }
+
+    /// <summary>Historical cost of this line at posting time.</summary>
+    public decimal CostTotal { get; set; }
+
+    /// <summary>Line revenue after its share of invoice discount, less CostTotal.</summary>
+    public decimal GrossProfit { get; set; }
 
     /// <summary>Serial number string (if the product is serial-tracked).</summary>
     public string? SerialNumber { get; set; }

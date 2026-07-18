@@ -12,6 +12,7 @@ public sealed class BusinessReportData
     public decimal Expenses { get; init; }
     public decimal CollectedCash { get; init; }
     public decimal PaidCash { get; init; }
+    public decimal SalesReturnCost { get; init; }
     public decimal EstimatedCostOfSales { get; init; }
     public decimal EstimatedGrossProfit => NetSales - EstimatedCostOfSales;
     public decimal EstimatedNetProfit => EstimatedGrossProfit - Expenses;
@@ -25,5 +26,11 @@ public sealed class BusinessReportData
 }
 
 public sealed record DailySalesReportItem(DateTime Date, int InvoiceCount, decimal Sales, decimal Paid, decimal Remaining);
-public sealed record TopProductReportItem(Guid ProductId, string ProductName, decimal QuantityBase, decimal Revenue);
+public sealed record TopProductReportItem(
+    Guid ProductId,
+    string ProductName,
+    decimal QuantityBase,
+    decimal Revenue,
+    decimal Cost,
+    decimal GrossProfit);
 public sealed record PartyBalanceReportItem(Guid PartyId, string PartyName, string? Phone, decimal Balance, decimal Limit);
