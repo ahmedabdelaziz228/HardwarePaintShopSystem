@@ -28,8 +28,8 @@
 | الجزء | التقنية |
 | --- | --- |
 | الواجهة | Flutter Material 3 / RTL |
-| إدارة الحالة | Provider + ChangeNotifier |
-| الاتصال | package:http |
+| إدارة الحالة | flutter_bloc باستخدام Cubit |
+| الاتصال | Dio 5.10 عبر ApiClient مركزي |
 | التخزين المحلي | SQLite عبر sqflite |
 | Token | flutter_secure_storage |
 | الإعدادات المحلية | shared_preferences |
@@ -37,45 +37,51 @@
 | الكاميرا | image_picker |
 | التنسيق المالي | intl |
 
-لم تتم إضافة Bloc أو Riverpod أو مكتبة Routing خارجية؛ المشروع مستمر على الأدوات الموجودة بالفعل.
+لا توجد استدعاءات API داخل الشاشات، ولا تعتمد الواجهة على `ChangeNotifier`. كل عملية غير متزامنة محاطة بمعالجة أخطاء عند حدودها، ثم تتحول إلى حالات Loading وSuccess وError مفهومة للمستخدم.
 
 ## 4. المعمارية الحالية
 
-مرحلة Auth وCore انتقلت إلى تنظيم Feature-first، وباقي الشاشات يتم نقلها تدريجيًا بدون كسر التطبيق:
+التطبيق منظم بالكامل بأسلوب Feature-first. يوجد داخل `lib` جذران معماريان فقط: `core` للبنية المشتركة و`features` لوظائف التطبيق. كل Feature تحتوي `data` و`logic` و`ui` حسب احتياجها:
 
 ```text
 lib/
 ├── main.dart
-├── app/
-│   ├── app.dart
-│   └── app_bootstrap.dart
 ├── core/
+│   ├── app/
 │   ├── config/
 │   ├── errors/
 │   ├── network/
+│   ├── state/
+│   ├── storage/
 │   ├── theme/
-│   └── utils/
-├── data/
-│   └── local/app_database.dart
-├── features/
-│   ├── auth/
-│   │   ├── data/
-│   │   ├── logic/
-│   │   └── presentation/
-│   └── shell/presentation/home_shell.dart
-├── routes/
-│   └── auth_gate.dart
-├── app_state.dart
-└── models.dart
+│   ├── utils/
+│   └── widgets/
+└── features/
+    ├── auth/
+    ├── dashboard/
+    ├── products/
+    ├── customers/
+    ├── alerts/
+    ├── sync/
+    └── shell/
+        ├── data/   # Models وRepositories عند الحاجة
+        ├── logic/  # Cubit وState
+        └── ui/     # Pages وWidgets الخاصة بالميزة
 ```
 
-الحالة الانتقالية مقصودة: `app_state.dart` و`home_shell.dart` سيقسمان إلى Controllers وRepositories وشاشات لكل Feature في المراحل التالية.
+قواعد الاعتماد:
+
+- `ui` تتعامل مع Cubit فقط ولا تنفذ HTTP أو SQL.
+- `logic` يدير الحالات والقرارات ولا يعرف تفاصيل Widgets.
+- `data` يحتوي Models وRepositories ويتعامل مع Core network/storage.
+- `core` لا يعتمد على Feature معينة.
+- الأنماط المشتركة بين أكثر من Feature فقط توضع في `core/widgets`.
 
 ## 5. تدفق تسجيل الدخول
 
-1. `ApiClient` يقرأ عنوان API والـToken المحفوظ.
-2. `AuthRepository` ينفذ طلبات Login وLogout واستعادة الجلسة.
-3. `AuthController` يدير حالات Loading وError وAuthenticated.
+1. `ApiClient` المبني على Dio يقرأ عنوان API والـToken المحفوظ.
+2. `AuthRepository` ينفذ طلبات Login وLogout واستعادة الجلسة داخل `try/catch`.
+3. `AuthCubit` يدير حالات Loading وError وAuthenticated.
 4. `AuthGate` يعرض Splash أو Login أو Home حسب الحالة.
 5. الـToken يحفظ في Secure Storage ويرسل كـBearer Token.
 6. API يعيد الصلاحيات، والواجهة تعرض العمليات المسموحة فقط.
@@ -138,6 +144,7 @@ New-NetFirewallRule `
 cd .\mobile\HardwarePaintShopMobile
 flutter create --platforms=android --org com.hardwarepaintshop .
 flutter pub get
+dart format --output=none --set-exit-if-changed lib test
 flutter analyze
 flutter test
 ```
@@ -235,12 +242,13 @@ GitHub Actions معد لتشغيل Analyze وTests وبناء APK Debug عند �
 - نفذ مزامنة يدوية.
 - راجع Log الـAPI وأخطاء التطبيق.
 
-## 14. خطة التطوير التالية
+## 14. ديون تقنية متبقية
 
-1. فصل Dashboard إلى Repository وController وشاشة مستقلة.
-2. نقل Products بالكامل إلى Feature مستقلة.
-3. نقل Customers ثم Alerts وSync.
-4. إكمال Design System والResponsive UI والـAccessibility.
-5. تقوية Offline cache وعمليات الحذف والتعارض.
-6. زيادة اختبارات Controllers وRepositories والمزامنة.
+تمت هجرة Dashboard وProducts وCustomers وAlerts وSync إلى Features مستقلة. البنود المتبقية لا تمنع التشغيل، لكنها أولويات المرحلة التالية:
 
+1. زيادة Unit Tests للـRepositories وحالات فشل الشبكة وSQLite.
+2. إضافة اختبارات Cubit تفصيلية لكل انتقال حالة.
+3. دعم Delta Sync للحذف والتعطيل وتعارض تعديل نفس السجل.
+4. توسيع كاش Dashboard وكشف حساب العميل للعمل بدون اتصال كاملًا.
+5. اختبار Accessibility وResponsive layout على أحجام أجهزة حقيقية إضافية.
+6. إضافة HTTPS أو VPN موثوق قبل أي وصول من خارج شبكة المحل.

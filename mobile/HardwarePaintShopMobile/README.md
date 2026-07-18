@@ -2,6 +2,38 @@
 
 Flutter Android companion for the local shop API. It supports Arabic RTL UI, login, dashboard, product/name/barcode/serial search, customer statements and collections, low-stock alerts, product creation with camera image, stock adjustments, local cache, and queued uploads.
 
+## Architecture
+
+The app uses feature-first clean architecture. `lib` has only two architectural roots: `core` for app-wide infrastructure and `features` for business capabilities. Every feature owns its `data`, `logic`, and `ui` layers.
+
+```text
+lib/
+├── main.dart
+├── core/
+│   ├── app/          # composition root and application widget
+│   ├── config/       # runtime configuration
+│   ├── errors/       # typed exceptions and error mapping
+│   ├── network/      # the shared Dio client
+│   ├── state/        # reusable state primitives
+│   ├── storage/      # SQLite cache and offline queue
+│   ├── theme/        # Material 3 design tokens
+│   ├── utils/        # parsing, formatting, and identifiers
+│   └── widgets/      # widgets reused by multiple features
+└── features/
+    ├── auth/
+    ├── dashboard/
+    ├── products/
+    ├── customers/
+    ├── alerts/
+    ├── sync/
+    └── shell/
+        ├── data/     # models and repositories when required
+        ├── logic/    # Cubits and immutable states
+        └── ui/       # pages and feature-specific widgets
+```
+
+State is managed by `flutter_bloc` Cubits. UI reads state and dispatches intentions only; repositories own data access, and `ApiClient` is the only HTTP boundary. Networking uses Dio with centralized timeout, HTTP, authentication, and connectivity error mapping. Asynchronous boundaries use `try/catch`, expose loading/error/success states, and do not silently swallow exceptions.
+
 ## Generate platform files once
 
 Install a current stable Flutter SDK, then run from this folder:
@@ -9,6 +41,7 @@ Install a current stable Flutter SDK, then run from this folder:
 ```powershell
 flutter create --platforms=android --org com.hardwarepaintshop .
 flutter pub get
+dart format --output=none --set-exit-if-changed lib test
 flutter analyze
 flutter test
 ```
@@ -41,3 +74,16 @@ flutter build apk --release
 ```
 
 The unsigned/debug application is for acceptance testing only.
+
+## Quality checks
+
+Run these before opening a pull request:
+
+```powershell
+dart format --output=none --set-exit-if-changed lib test
+flutter analyze
+flutter test
+flutter build apk --debug
+```
+
+GitHub Actions runs the same checks and publishes the debug APK as a workflow artifact.

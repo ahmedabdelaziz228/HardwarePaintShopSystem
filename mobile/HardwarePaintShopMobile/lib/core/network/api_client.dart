@@ -1,109 +1,210 @@
-import 'dart:convert';
-import 'dart:io';
-
+import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hardware_paint_shop_mobile/core/config/app_config.dart';
 import 'package:hardware_paint_shop_mobile/core/errors/api_exception.dart';
-import 'package:http/http.dart' as http;
+import 'package:hardware_paint_shop_mobile/core/errors/error_mapper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Handles HTTP transport, API errors, URL preferences, and secure bearer tokens.
+/// Central Dio transport. Widgets and Cubits never perform HTTP calls directly.
 class ApiClient {
-  ApiClient({http.Client? client}) : _client = client ?? http.Client();
+  ApiClient({Dio? dio, FlutterSecureStorage? secureStorage})
+      : _dio = dio ??
+            Dio(
+              BaseOptions(
+                connectTimeout: const Duration(seconds: 15),
+                sendTimeout: const Duration(seconds: 25),
+                receiveTimeout: const Duration(seconds: 25),
+                responseType: ResponseType.json,
+                headers: const <String, dynamic>{
+                  Headers.acceptHeader: Headers.jsonContentType,
+                  Headers.contentTypeHeader: Headers.jsonContentType,
+                },
+                validateStatus: (status) => status != null,
+              ),
+            ),
+        _secureStorage = secureStorage ?? const FlutterSecureStorage();
 
-  static const _secure = FlutterSecureStorage();
-  final http.Client _client;
+  static const _apiUrlKey = 'api_url';
+  static const _tokenKey = 'api_token';
+
+  final Dio _dio;
+  final FlutterSecureStorage _secureStorage;
   String _baseUrl = '';
   String? _token;
 
   String get baseUrl => _baseUrl;
   bool get hasToken => _token?.isNotEmpty == true;
+  String imageUrl(String productId) => '$_baseUrl/api/products/$productId/image';
+  Map<String, String> get imageHeaders =>
+      _token == null ? const {} : {'Authorization': 'Bearer $_token'};
 
   Future<void> initialize() async {
-    final prefs = await SharedPreferences.getInstance();
-    _baseUrl = normalizeBaseUrl(
-      prefs.getString('api_url') ?? AppConfig.defaultApiBaseUrl,
-    );
-    _token = await _secure.read(key: 'api_token');
-  }
-
-  Future<void> configure(String url) async {
-    _baseUrl = normalizeBaseUrl(url);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('api_url', _baseUrl);
-  }
-
-  Future<Map<String, dynamic>> login(String username, String password, String deviceName) async {
-    final response = await _send('POST', '/api/auth/login', body: {
-      'username': username,
-      'password': password,
-      'deviceName': deviceName,
-    }, authenticated: false);
-    _token = '${response['token']}';
-    await _secure.write(key: 'api_token', value: _token);
-    return response;
-  }
-
-  Future<void> logout() async {
     try {
-      if (hasToken) await post('/api/auth/logout');
-    } finally {
-      _token = null;
-      await _secure.delete(key: 'api_token');
+      final preferences = await SharedPreferences.getInstance();
+      _baseUrl = normalizeBaseUrl(
+        preferences.getString(_apiUrlKey) ?? AppConfig.defaultApiBaseUrl,
+      );
+      _token = await _secureStorage.read(key: _tokenKey);
+    } catch (error) {
+      throw StorageException(
+        'تعذر قراءة إعدادات الاتصال المحفوظة.',
+        cause: error,
+      );
     }
   }
 
-  Future<dynamic> get(String path, {Map<String, String>? query}) =>
-      _send('GET', path, query: query);
-  Future<dynamic> post(String path, {Object? body}) => _send('POST', path, body: body);
+  Future<void> configure(String url) async {
+    try {
+      _baseUrl = normalizeBaseUrl(url);
+      if (_baseUrl.isEmpty) {
+        throw const ApiException('أدخل عنوان API أولًا.');
+      }
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setString(_apiUrlKey, _baseUrl);
+    } catch (error) {
+      throw ErrorMapper.map(error);
+    }
+  }
 
-  String imageUrl(String productId) => '$_baseUrl/api/products/$productId/image';
-  Map<String, String> get imageHeaders => _token == null ? {} : {'Authorization': 'Bearer $_token'};
+  Future<Map<String, dynamic>> login(
+    String username,
+    String password,
+    String deviceName,
+  ) async {
+    try {
+      final response = await _request<Map<String, dynamic>>(
+        'POST',
+        '/api/auth/login',
+        body: {
+          'username': username,
+          'password': password,
+          'deviceName': deviceName,
+        },
+        authenticated: false,
+      );
+      _token = '${response['token']}';
+      await _secureStorage.write(key: _tokenKey, value: _token);
+      return response;
+    } catch (error) {
+      throw ErrorMapper.map(error);
+    }
+  }
 
-  Future<dynamic> _send(
+  Future<void> logout() async {
+    Object? remoteError;
+    try {
+      if (hasToken) await post('/api/auth/logout');
+    } catch (error) {
+      // A remote logout failure must not keep a local session alive.
+      remoteError = error;
+    } finally {
+      _token = null;
+      try {
+        await _secureStorage.delete(key: _tokenKey);
+      } catch (storageError) {
+        throw StorageException(
+          'تعذر حذف جلسة الدخول من الهاتف.',
+          cause: storageError,
+        );
+      }
+    }
+    if (remoteError != null && remoteError is! NetworkException) {
+      throw ErrorMapper.map(remoteError);
+    }
+  }
+
+  Future<T> get<T>(
+    String path, {
+    Map<String, dynamic>? query,
+  }) async {
+    try {
+      return await _request<T>('GET', path, query: query);
+    } catch (error) {
+      throw ErrorMapper.map(error);
+    }
+  }
+
+  Future<T> post<T>(String path, {Object? body}) async {
+    try {
+      return await _request<T>('POST', path, body: body);
+    } catch (error) {
+      throw ErrorMapper.map(error);
+    }
+  }
+
+  Future<T> _request<T>(
     String method,
     String path, {
-    Map<String, String>? query,
+    Map<String, dynamic>? query,
     Object? body,
     bool authenticated = true,
   }) async {
     if (_baseUrl.isEmpty) throw const ApiException('أدخل عنوان API أولًا.');
-    var uri = Uri.parse('$_baseUrl$path');
-    if (query != null) uri = uri.replace(queryParameters: query);
-    final headers = <String, String>{'Accept': 'application/json', 'Content-Type': 'application/json'};
-    if (authenticated && _token != null) headers['Authorization'] = 'Bearer $_token';
     try {
-      final response = method == 'GET'
-          ? await _client.get(uri, headers: headers).timeout(const Duration(seconds: 15))
-          : await _client.post(uri, headers: headers, body: body == null ? null : jsonEncode(body))
-              .timeout(const Duration(seconds: 25));
-      dynamic decoded;
-      if (response.body.isNotEmpty) {
-        try {
-          decoded = jsonDecode(utf8.decode(response.bodyBytes));
-        } catch (_) {
-          decoded = response.body;
-        }
-      }
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        final message = decoded is Map ? '${decoded['error'] ?? 'فشل الطلب'}' : 'فشل الطلب (${response.statusCode})';
-        if (response.statusCode == 401) {
+      final response = await _dio.request<dynamic>(
+        '$_baseUrl$path',
+        data: body,
+        queryParameters: query,
+        options: Options(
+          method: method,
+          headers: authenticated && _token != null
+              ? {'Authorization': 'Bearer $_token'}
+              : null,
+        ),
+      );
+      final statusCode = response.statusCode ?? 0;
+      final data = response.data;
+      if (statusCode < 200 || statusCode >= 300) {
+        if (statusCode == 401) {
           _token = null;
-          await _secure.delete(key: 'api_token');
+          await _secureStorage.delete(key: _tokenKey);
         }
-        throw ApiException(message, statusCode: response.statusCode);
+        final message = data is Map
+            ? '${data['error'] ?? data['message'] ?? 'فشل الطلب'}'
+            : 'فشل الطلب ($statusCode)';
+        throw ApiException(message, statusCode: statusCode);
       }
-      return decoded;
-    } on SocketException {
-      throw const ApiException('تعذر الوصول إلى اللاب. تأكد من الواي فاي وعنوان API.');
-    } on HttpException catch (e) {
-      throw ApiException(e.message);
+      return data as T;
+    } on DioException catch (error) {
+      throw _mapDioException(error);
+    } catch (error) {
+      throw ErrorMapper.map(error);
+    }
+  }
+
+  static AppException _mapDioException(DioException error) {
+    switch (error.type) {
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.sendTimeout:
+      case DioExceptionType.receiveTimeout:
+      case DioExceptionType.transformTimeout:
+      case DioExceptionType.connectionError:
+        return NetworkException(
+          'تعذر الوصول إلى اللاب. تأكد من الواي فاي وعنوان API.',
+          cause: error,
+        );
+      case DioExceptionType.cancel:
+        return NetworkException('تم إلغاء الطلب.', cause: error);
+      case DioExceptionType.badCertificate:
+        return NetworkException('شهادة اتصال API غير موثوقة.', cause: error);
+      case DioExceptionType.badResponse:
+        final statusCode = error.response?.statusCode;
+        final data = error.response?.data;
+        final message = data is Map
+            ? '${data['error'] ?? data['message'] ?? 'فشل الطلب'}'
+            : 'فشل الطلب (${statusCode ?? '-'})';
+        return ApiException(message, statusCode: statusCode, cause: error);
+      case DioExceptionType.unknown:
+        return NetworkException('حدث خطأ في الاتصال بالخادم.', cause: error);
     }
   }
 
   static String normalizeBaseUrl(String value) {
     var url = value.trim();
-    if (!url.startsWith('http://') && !url.startsWith('https://')) url = 'http://$url';
+    if (url.isEmpty) return '';
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'http://$url';
+    }
     while (url.endsWith('/')) {
       url = url.substring(0, url.length - 1);
     }

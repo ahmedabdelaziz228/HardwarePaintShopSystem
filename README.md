@@ -76,6 +76,8 @@ flutter build apk --release
 
 The APK is produced under `build\app\outputs\flutter-apk\app-release.apk`. See the mobile folder README for phone and emulator API addresses.
 
+The Flutter client uses feature-first clean architecture under `core` and `features`. Each feature separates `data`, `logic`, and `ui`; state is managed with Cubit from `flutter_bloc`, and all network traffic goes through a centralized Dio client with typed error handling.
+
 On the first connection failure, the desktop setup window asks for PostgreSQL host, port, database, username, and password. The verified connection is saved in the current Windows user's `HARDWARE_PAINT_SHOP_CONNECTION_STRING` environment variable.
 
 Development default login on a new database:
