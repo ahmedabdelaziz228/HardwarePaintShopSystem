@@ -38,7 +38,13 @@ public sealed class InventoryService : IInventoryService
             p.MinStockBaseQuantity, p.ProductCost != null ? p.ProductCost.AverageCostBaseUnit : 0,
             (p.StockMovements.Select(m => (decimal?)m.QuantityBaseUnit).Sum() ?? 0) *
                 (p.ProductCost != null ? p.ProductCost.AverageCostBaseUnit : 0),
-            p.ProductSerials.Count(s => s.Status == SerialStatus.Available)));
+            p.ProductSerials.Count(s => s.Status == SerialStatus.Available),
+            p.CategoryId,
+            p.ProductBarcodes.OrderBy(b => b.CreatedAt).Select(b => b.Barcode).FirstOrDefault(),
+            p.ImagePath,
+            p.MainSupplier != null ? p.MainSupplier.Name : null,
+            p.ProductPrices.OrderBy(pp => pp.PriceGroup.Name)
+                .Select(pp => (decimal?)pp.SalePrice).FirstOrDefault()));
         if (lowOnly) rows = rows.Where(i => i.QuantityBase <= i.MinimumQuantity);
         return await rows.OrderBy(i => i.ProductName).Take(2000).ToListAsync(cancellationToken);
     }
@@ -124,6 +130,97 @@ public sealed class InventoryService : IInventoryService
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return countId;
+    }
+
+    public async Task<StockAdjustmentResult> AdjustStockAsync(
+        StockAdjustmentRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var adjustmentType = request.AdjustmentType.Trim().ToLowerInvariant();
+        if (adjustmentType is not ("add" or "remove" or "set"))
+            throw new InvalidOperationException("نوع حركة المخزون غير صحيح.");
+        if (request.ProductId == Guid.Empty)
+            throw new InvalidOperationException("اختر المنتج أولًا.");
+        if (request.QuantityBase < 0 || (adjustmentType != "set" && request.QuantityBase == 0))
+            throw new InvalidOperationException("أدخل كمية صحيحة أكبر من صفر.");
+        if (string.IsNullOrWhiteSpace(request.Reason))
+            throw new InvalidOperationException("سبب الحركة مطلوب.");
+
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.Serializable, cancellationToken);
+        var product = await db.Products
+            .Include(p => p.ProductUnits)
+            .SingleOrDefaultAsync(p => p.Id == request.ProductId && p.IsActive, cancellationToken)
+            ?? throw new KeyNotFoundException("المنتج غير موجود أو غير نشط.");
+        if (product.IsSerialTracked)
+            throw new InvalidOperationException("لا يمكن تعديل رصيد منتج متتبع بالسيريال من هذه الشاشة.");
+
+        var previousBalance = await db.StockMovements
+            .Where(m => m.ProductId == request.ProductId)
+            .SumAsync(m => (decimal?)m.QuantityBaseUnit, cancellationToken) ?? 0;
+        var difference = adjustmentType switch
+        {
+            "add" => request.QuantityBase,
+            "remove" => -request.QuantityBase,
+            _ => request.QuantityBase - previousBalance
+        };
+        var newBalance = previousBalance + difference;
+        if (newBalance < 0)
+            throw new InvalidOperationException($"لا يمكن صرف الكمية؛ الرصيد المتاح {previousBalance:0.###} فقط.");
+        if (difference == 0)
+            throw new InvalidOperationException("الرصيد الجديد مطابق للرصيد الحالي، لا توجد حركة لتسجيلها.");
+
+        var now = DateTime.UtcNow;
+        var movementId = Guid.NewGuid();
+        var baseProductUnitId = product.ProductUnits
+            .Where(u => u.IsActive && u.UnitId == product.BaseUnitId)
+            .Select(u => (Guid?)u.Id)
+            .FirstOrDefault();
+        var reference = Normalize(request.ReferenceNo);
+        var details = Normalize(request.Notes);
+        var noteParts = new[]
+        {
+            request.Reason.Trim(),
+            reference is null ? null : $"مرجع: {reference}",
+            details
+        }.Where(v => !string.IsNullOrWhiteSpace(v));
+
+        db.StockMovements.Add(new StockMovement
+        {
+            Id = movementId,
+            ProductId = request.ProductId,
+            ProductUnitId = baseProductUnitId,
+            QuantityBaseUnit = difference,
+            MovementType = StockMovementType.Adjustment,
+            ReferenceType = "ManualStockAdjustment",
+            UserId = _authService.CurrentUserId,
+            Notes = string.Join(" — ", noteParts),
+            CreatedAt = now
+        });
+        db.AuditLogs.Add(new AuditLog
+        {
+            Id = Guid.NewGuid(),
+            TableName = "StockMovements",
+            RecordId = movementId,
+            Action = AuditAction.Insert,
+            ChangedByUserId = _authService.CurrentUserId,
+            NewValuesJson = JsonSerializer.Serialize(new
+            {
+                request.ProductId,
+                AdjustmentType = adjustmentType,
+                PreviousBalance = previousBalance,
+                Difference = difference,
+                NewBalance = newBalance,
+                Reason = request.Reason,
+                ReferenceNo = reference
+            }),
+            CreatedAt = now
+        });
+
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return new StockAdjustmentResult(movementId, previousBalance, difference, newBalance);
     }
 
     public async Task<List<AlertListItem>> RefreshAlertsAsync(

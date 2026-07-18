@@ -2,6 +2,12 @@
 
 .NET 8 WPF shop-management system backed by PostgreSQL and organized as Domain, Application, Infrastructure, Desktop, API, and test projects.
 
+## Arabic project documentation
+
+- [Desktop application guide](docs/DESKTOP_GUIDE_AR.md)
+- [Flutter mobile application guide](mobile/HardwarePaintShopMobile/MOBILE_APP_GUIDE_AR.md)
+- [System idea and desktop/mobile integration](docs/SYSTEM_OVERVIEW_AR.md)
+
 ## Implemented modules
 
 - Login, users, roles, granular permissions, and immutable audit records.

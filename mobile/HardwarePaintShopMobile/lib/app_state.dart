@@ -1,27 +1,23 @@
-import 'dart:convert';
-import 'dart:math';
-
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:hardware_paint_shop_mobile/core/errors/api_exception.dart';
+import 'package:hardware_paint_shop_mobile/core/network/api_client.dart';
+import 'package:hardware_paint_shop_mobile/core/utils/id_generator.dart';
+import 'package:hardware_paint_shop_mobile/data/local/app_database.dart';
 
-import 'api_client.dart';
-import 'local_store.dart';
 import 'models.dart';
 
+/// Temporary coordinator for non-authenticated RC1 features during migration.
 class AppState extends ChangeNotifier {
-  AppState(this.api, this.store);
+  AppState(this.api, this.database);
 
   final ApiClient api;
-  final LocalStore store;
+  final AppDatabase database;
 
   bool initialized = false;
   bool busy = false;
-  bool authenticated = false;
   bool online = false;
   String? error;
-  String userName = '';
   String shopName = 'محل الحدايد والبوهيات';
-  Set<String> permissions = {};
   Map<String, dynamic> dashboard = {};
   List<ProductSummary> products = [];
   List<CustomerSummary> customers = [];
@@ -30,43 +26,10 @@ class AppState extends ChangeNotifier {
   Map<String, dynamic> lookups = {};
   DateTime? lastSync;
 
-  Future<void> initialize() async {
-    await api.initialize();
-    lastSync = await store.lastSync();
-    pending = await store.pendingOperations();
-    if (api.hasToken) {
-      try {
-        final me = await api.get('/api/auth/me') as Map<String, dynamic>;
-        _applyUser(me);
-        authenticated = true;
-        online = true;
-        await refreshHome();
-      } catch (_) {
-        authenticated = false;
-      }
-    }
+  Future<void> initializeLocalState() async {
+    lastSync = await database.lastSync();
+    pending = await database.pendingOperations();
     initialized = true;
-    notifyListeners();
-  }
-
-  Future<void> login(String url, String username, String password) async {
-    await _work(() async {
-      await api.configure(url);
-      final result = await api.login(username.trim(), password, await _deviceName());
-      userName = '${result['userName'] ?? ''}';
-      permissions = ((result['permissions'] as List?) ?? []).map((e) => '$e').toSet();
-      authenticated = true;
-      online = true;
-      await refreshHome();
-    });
-  }
-
-  Future<void> logout() async {
-    await api.logout();
-    authenticated = false;
-    userName = '';
-    permissions = {};
-    dashboard = {};
     notifyListeners();
   }
 
@@ -82,7 +45,7 @@ class AppState extends ChangeNotifier {
       shopName = '${settings['shopName'] ?? shopName}';
       final alertRows = (values[2] as List).cast<Map<String, dynamic>>();
       alerts = alertRows.map(ShopAlert.fromJson).toList();
-      await store.saveAlerts(alertRows);
+      await database.saveAlerts(alertRows);
       online = true;
     }, useBusy: false);
   }
@@ -93,10 +56,10 @@ class AppState extends ChangeNotifier {
       final rows = (await api.get('/api/products/search', query: {'query': query, 'limit': '100'}) as List)
           .cast<Map<String, dynamic>>();
       products = rows.map(ProductSummary.fromJson).toList();
-      await store.saveProducts(rows);
+      await database.saveProducts(rows);
       online = true;
     } catch (e) {
-      products = await store.searchProducts(query);
+      products = await database.searchProducts(query);
       online = false;
       error = products.isEmpty ? '$e' : 'عرض نتائج محفوظة لأن اللاب غير متصل.';
     }
@@ -124,10 +87,10 @@ class AppState extends ChangeNotifier {
       final rows = (await api.get('/api/customers/search', query: {'query': query, 'limit': '150'}) as List)
           .cast<Map<String, dynamic>>();
       customers = rows.map(CustomerSummary.fromJson).toList();
-      await store.saveCustomers(rows);
+      await database.saveCustomers(rows);
       online = true;
     } catch (e) {
-      customers = await store.searchCustomers(query);
+      customers = await database.searchCustomers(query);
       online = false;
       error = customers.isEmpty ? '$e' : 'عرض عملاء محفوظين لأن اللاب غير متصل.';
     }
@@ -174,15 +137,15 @@ class AppState extends ChangeNotifier {
 
   Future<void> sync() async {
     await _work(() async {
-      pending = await store.pendingOperations();
+      pending = await database.pendingOperations();
       if (pending.isNotEmpty) {
         final response = await api.post('/api/sync/upload', body: {
           'operations': pending.map((e) => e.toApiJson()).toList(),
         }) as Map<String, dynamic>;
         for (final row in (response['results'] as List).cast<Map<String, dynamic>>()) {
-          await store.markOperation('${row['operationId']}', '${row['status']}', error: row['message']?.toString());
+          await database.markOperation('${row['operationId']}', '${row['status']}', error: row['message']?.toString());
         }
-        await store.removeSuccessfulOperations();
+        await database.removeSuccessfulOperations();
       }
       final since = lastSync ?? DateTime.now().toUtc().subtract(const Duration(days: 30));
       final snapshot = await api.get('/api/sync/download', query: {'since': since.toIso8601String()}) as Map<String, dynamic>;
@@ -190,13 +153,13 @@ class AppState extends ChangeNotifier {
       final customerRows = (snapshot['customers'] as List).cast<Map<String, dynamic>>();
       final alertRows = (snapshot['alerts'] as List).cast<Map<String, dynamic>>();
       final barcodeRows = (snapshot['barcodes'] as List).cast<Map<String, dynamic>>();
-      await store.saveProducts(productRows);
-      await store.saveCustomers(customerRows);
-      await store.saveAlerts(alertRows);
-      await store.saveBarcodes(barcodeRows);
+      await database.saveProducts(productRows);
+      await database.saveCustomers(customerRows);
+      await database.saveAlerts(alertRows);
+      await database.saveBarcodes(barcodeRows);
       lastSync = DateTime.parse('${snapshot['serverTime']}');
-      await store.setLastSync(lastSync!);
-      pending = await store.pendingOperations();
+      await database.setLastSync(lastSync!);
+      pending = await database.pendingOperations();
       online = true;
     });
   }
@@ -213,13 +176,13 @@ class AppState extends ChangeNotifier {
     } catch (e) {
       if (e is ApiException && e.statusCode != null) rethrow;
       final operation = PendingOperation(
-        operationId: _uuid(),
+        operationId: IdGenerator.uuidV4(),
         type: type,
         payload: payload,
         createdAt: DateTime.now().toUtc(),
       );
-      await store.queue(operation);
-      pending = await store.pendingOperations();
+      await database.queue(operation);
+      pending = await database.pendingOperations();
       online = false;
     }
     notifyListeners();
@@ -240,28 +203,4 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  void _applyUser(Map<String, dynamic> row) {
-    userName = '${row['userName'] ?? ''}';
-    permissions = ((row['permissions'] as List?) ?? []).map((e) => '$e').toSet();
-  }
-
-  Future<String> _deviceName() async {
-    final prefs = await SharedPreferences.getInstance();
-    var value = prefs.getString('device_name');
-    if (value == null) {
-      value = 'Android-${_uuid().substring(0, 8)}';
-      await prefs.setString('device_name', value);
-    }
-    return value;
-  }
-
-  String _uuid() {
-    final random = Random.secure();
-    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
-    bytes[6] = (bytes[6] & 0x0f) | 0x40;
-    bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-'
-        '${hex.substring(16, 20)}-${hex.substring(20)}';
-  }
 }

@@ -70,6 +70,10 @@ public sealed class ProductSaveRequest
     public bool IsSerialTracked { get; init; }
     public bool IsActive { get; init; } = true;
     public string? Notes { get; init; }
+    /// <summary>Used only while creating a product. Stored as an OpeningBalance movement.</summary>
+    public decimal OpeningQuantityBase { get; init; }
+    /// <summary>Initial weighted-average cost for the base unit.</summary>
+    public decimal OpeningCostBaseUnit { get; init; }
     public IReadOnlyCollection<ProductUnitInput> Units { get; init; } = Array.Empty<ProductUnitInput>();
     public IReadOnlyCollection<ProductPriceInput> Prices { get; init; } = Array.Empty<ProductPriceInput>();
     public IReadOnlyCollection<ProductBarcodeInput> Barcodes { get; init; } = Array.Empty<ProductBarcodeInput>();

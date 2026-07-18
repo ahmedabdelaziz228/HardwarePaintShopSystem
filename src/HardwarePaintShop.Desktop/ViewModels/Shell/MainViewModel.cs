@@ -123,6 +123,23 @@ public partial class MainViewModel : BaseViewModel
         NavigateToKey(item.PageKey, item.Label);
     }
 
+    [RelayCommand]
+    private void NavigateByKey(string pageKey)
+    {
+        var navigationKey = pageKey == "InventoryAddProduct" ? "Inventory" : pageKey;
+        var item = NavigationItems.FirstOrDefault(i => i.PageKey == navigationKey && i.IsAvailable);
+        if (item is null)
+            return;
+
+        Navigate(item);
+        if (pageKey == "InventoryAddProduct" &&
+            CurrentPage is Views.Inventory.InventoryView inventoryView &&
+            inventoryView.DataContext is HardwarePaintShop.Desktop.ViewModels.Inventory.InventoryViewModel inventoryViewModel)
+        {
+            inventoryViewModel.ShowAddProductCommand.Execute(null);
+        }
+    }
+
     private void NavigateToKey(string pageKey, string title)
     {
         CurrentPageTitle = title;

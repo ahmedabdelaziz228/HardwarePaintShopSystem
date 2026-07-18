@@ -16,8 +16,10 @@ public sealed class DashboardService : IDashboardService
     public async Task<DashboardSummary> GetSummaryAsync(CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
-        var todayStartUtc = DateTime.Today.ToUniversalTime();
-        var tomorrowStartUtc = DateTime.Today.AddDays(1).ToUniversalTime();
+        var todayLocal = DateTime.Today;
+        var todayStartUtc = todayLocal.ToUniversalTime();
+        var tomorrowStartUtc = todayLocal.AddDays(1).ToUniversalTime();
+        var weekStartUtc = todayLocal.AddDays(-6).ToUniversalTime();
 
         var todaySales = await db.SalesInvoices
             .AsNoTracking()
@@ -49,6 +51,14 @@ public sealed class DashboardService : IDashboardService
             .AsNoTracking()
             .Where(e => e.ExpenseDate >= todayStartUtc && e.ExpenseDate < tomorrowStartUtc)
             .SumAsync(e => (decimal?)e.Amount, cancellationToken) ?? 0;
+        var todayCost = await db.SalesInvoiceItems
+            .AsNoTracking()
+            .Where(i => i.SalesInvoice.InvoiceDate >= todayStartUtc &&
+                        i.SalesInvoice.InvoiceDate < tomorrowStartUtc &&
+                        i.SalesInvoice.Status != InvoiceStatus.Voided)
+            .SumAsync(i => (decimal?)(i.QuantityBaseUnit *
+                (i.Product.ProductCost != null ? i.Product.ProductCost.AverageCostBaseUnit : 0)),
+                cancellationToken) ?? 0;
         var cashboxBalance = await db.Cashboxes
             .AsNoTracking()
             .Where(c => c.IsActive)
@@ -68,13 +78,52 @@ public sealed class DashboardService : IDashboardService
             .Select(p => new
             {
                 p.Name,
+                CategoryName = p.Category != null ? p.Category.Name : "بدون تصنيف",
                 p.MinStockBaseQuantity,
                 BaseUnitName = p.BaseUnit.Name,
+                AverageCost = p.ProductCost != null ? p.ProductCost.AverageCostBaseUnit : 0,
                 CurrentQuantity = p.StockMovements
                     .Select(m => (decimal?)m.QuantityBaseUnit)
                     .Sum() ?? 0
             })
             .ToListAsync(cancellationToken);
+
+        var inventoryValue = productStocks
+            .Where(p => p.CurrentQuantity > 0)
+            .Sum(p => p.CurrentQuantity * p.AverageCost);
+        var inventoryByCategory = BuildInventoryDistribution(productStocks
+            .Where(p => p.CurrentQuantity > 0)
+            .Select(p => (p.CategoryName, Value: p.CurrentQuantity * p.AverageCost)), inventoryValue);
+
+        var weeklySalesRows = await db.SalesInvoices
+            .AsNoTracking()
+            .Where(i => i.InvoiceDate >= weekStartUtc &&
+                        i.InvoiceDate < tomorrowStartUtc &&
+                        i.Status != InvoiceStatus.Voided)
+            .Select(i => new { i.InvoiceDate, i.TotalAmount })
+            .ToListAsync(cancellationToken);
+        var weeklyExpenseRows = await db.Expenses
+            .AsNoTracking()
+            .Where(e => e.ExpenseDate >= weekStartUtc && e.ExpenseDate < tomorrowStartUtc)
+            .Select(e => new { e.ExpenseDate, e.Amount })
+            .ToListAsync(cancellationToken);
+        var weeklyTrend = Enumerable.Range(0, 7)
+            .Select(offset => todayLocal.AddDays(offset - 6))
+            .Select(day => new DashboardTrendPoint(
+                day,
+                weeklySalesRows
+                    .Where(i => i.InvoiceDate.ToLocalTime().Date == day)
+                    .Sum(i => i.TotalAmount),
+                weeklyExpenseRows
+                    .Where(e => e.ExpenseDate.ToLocalTime().Date == day)
+                    .Sum(e => e.Amount)))
+            .ToList();
+        var yesterdaySales = weeklyTrend[^2].Sales;
+        var salesChangePercentage = yesterdaySales == 0
+            ? (todaySales > 0 ? 100 : 0)
+            : Math.Round((todaySales - yesterdaySales) / yesterdaySales * 100, 1);
+
+        var recentOperations = await GetRecentOperationsAsync(db, cancellationToken);
         var lowStock = productStocks
             .Where(p => p.MinStockBaseQuantity > 0 && p.CurrentQuantity <= p.MinStockBaseQuantity)
             .OrderBy(p => p.CurrentQuantity - p.MinStockBaseQuantity)
@@ -83,6 +132,9 @@ public sealed class DashboardService : IDashboardService
         return new DashboardSummary
         {
             TodaySales = todaySales,
+            EstimatedTodayProfit = todaySales - todayCost - todayExpenses,
+            InventoryValue = inventoryValue,
+            SalesChangePercentage = salesChangePercentage,
             TodayCollections = todayCollections,
             TodayExpenses = todayExpenses,
             CashboxBalance = cashboxBalance,
@@ -100,7 +152,96 @@ public sealed class DashboardService : IDashboardService
                     p.CurrentQuantity,
                     p.MinStockBaseQuantity,
                     p.BaseUnitName))
-                .ToList()
+                .ToList(),
+            WeeklyTrend = weeklyTrend,
+            InventoryByCategory = inventoryByCategory,
+            RecentOperations = recentOperations
         };
+    }
+
+    private static List<InventoryCategorySummary> BuildInventoryDistribution(
+        IEnumerable<(string CategoryName, decimal Value)> rows,
+        decimal totalValue)
+    {
+        if (totalValue <= 0)
+            return new List<InventoryCategorySummary>();
+
+        var groups = rows
+            .GroupBy(r => r.CategoryName)
+            .Select(g => new { CategoryName = g.Key, Value = g.Sum(r => r.Value) })
+            .Where(g => g.Value > 0)
+            .OrderByDescending(g => g.Value)
+            .ToList();
+
+        var selected = groups.Take(3)
+            .Select(g => (g.CategoryName, g.Value))
+            .ToList();
+        var otherValue = groups.Skip(3).Sum(g => g.Value);
+        if (otherValue > 0)
+            selected.Add(("أخرى", otherValue));
+
+        return selected
+            .Select(g => new InventoryCategorySummary(
+                g.CategoryName,
+                g.Value,
+                Math.Round(g.Value / totalValue * 100, 1)))
+            .ToList();
+    }
+
+    private static async Task<List<RecentOperationSummary>> GetRecentOperationsAsync(
+        AppDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var sales = await db.SalesInvoices
+            .AsNoTracking()
+            .Where(i => i.Status != InvoiceStatus.Voided)
+            .OrderByDescending(i => i.CreatedAt)
+            .Take(5)
+            .Select(i => new
+            {
+                i.InvoiceNo,
+                CustomerName = i.Customer != null ? i.Customer.Name : "عميل نقدي",
+                i.TotalAmount,
+                i.CreatedAt
+            })
+            .ToListAsync(cancellationToken);
+        var purchases = await db.PurchaseInvoices
+            .AsNoTracking()
+            .Where(i => i.Status != InvoiceStatus.Voided)
+            .OrderByDescending(i => i.CreatedAt)
+            .Take(5)
+            .Select(i => new
+            {
+                i.InvoiceNo,
+                SupplierName = i.Supplier.Name,
+                i.TotalAmount,
+                i.CreatedAt
+            })
+            .ToListAsync(cancellationToken);
+        var expenses = await db.Expenses
+            .AsNoTracking()
+            .OrderByDescending(e => e.CreatedAt)
+            .Take(5)
+            .Select(e => new
+            {
+                CategoryName = e.ExpenseCategory.Name,
+                e.Amount,
+                e.CreatedAt
+            })
+            .ToListAsync(cancellationToken);
+
+        return sales
+            .Select(i => new RecentOperationSummary(
+                "sale", $"فاتورة بيع #{i.InvoiceNo}", i.CustomerName,
+                i.TotalAmount, i.CreatedAt.ToLocalTime()))
+            .Concat(purchases.Select(i => new RecentOperationSummary(
+                "purchase", $"فاتورة شراء #{i.InvoiceNo}", i.SupplierName,
+                i.TotalAmount, i.CreatedAt.ToLocalTime())))
+            .Concat(expenses.Select(e => new RecentOperationSummary(
+                "expense", "مصروف مسجل", e.CategoryName,
+                e.Amount, e.CreatedAt.ToLocalTime())))
+            .OrderByDescending(i => i.OccurredAt)
+            .Take(5)
+            .ToList();
     }
 }

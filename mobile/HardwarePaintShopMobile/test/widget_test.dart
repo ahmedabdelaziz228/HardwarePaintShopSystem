@@ -1,15 +1,26 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hardware_paint_shop_mobile/api_client.dart';
+import 'package:hardware_paint_shop_mobile/app/app.dart';
 import 'package:hardware_paint_shop_mobile/app_state.dart';
-import 'package:hardware_paint_shop_mobile/local_store.dart';
-import 'package:hardware_paint_shop_mobile/main.dart';
+import 'package:hardware_paint_shop_mobile/core/network/api_client.dart';
+import 'package:hardware_paint_shop_mobile/data/local/app_database.dart';
+import 'package:hardware_paint_shop_mobile/features/auth/data/auth_repository.dart';
+import 'package:hardware_paint_shop_mobile/features/auth/logic/auth_controller.dart';
+import 'package:hardware_paint_shop_mobile/routes/auth_gate.dart';
 import 'package:provider/provider.dart';
 
 void main() {
   testWidgets('shows loading screen before initialization', (tester) async {
-    final state = AppState(ApiClient(), LocalStore());
+    final apiClient = ApiClient();
+    final state = AppState(apiClient, AppDatabase());
+    final auth = AuthController(AuthRepository(apiClient));
     await tester.pumpWidget(
-      ChangeNotifierProvider.value(value: state, child: const ShopMobileApp()),
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: state),
+          ChangeNotifierProvider.value(value: auth),
+        ],
+        child: const ShopMobileApp(),
+      ),
     );
     expect(find.byType(SplashScreen), findsOneWidget);
   });

@@ -1,0 +1,10 @@
+/// A user-safe failure returned by the local shop API or network transport.
+class ApiException implements Exception {
+  const ApiException(this.message, {this.statusCode});
+
+  final String message;
+  final int? statusCode;
+
+  @override
+  String toString() => message;
+}

@@ -3,147 +3,447 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:charts="clr-namespace:HardwarePaintShop.Desktop.Controls"
              mc:Ignorable="d"
+             d:DesignHeight="900" d:DesignWidth="1180"
              FlowDirection="RightToLeft"
-             Background="{StaticResource ContentBackgroundBrush}">
-    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="22,18">
-        <StackPanel>
-            <Border CornerRadius="12" Padding="24,20" Margin="0,0,0,16">
-                <Border.Background>
-                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                        <GradientStop Color="#1D4ED8" Offset="0"/>
-                        <GradientStop Color="#2563EB" Offset="0.55"/>
-                        <GradientStop Color="#0EA5E9" Offset="1"/>
-                    </LinearGradientBrush>
-                </Border.Background>
+             Background="#F5F8FC">
+    <UserControl.Resources>
+        <Style x:Key="DashboardCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="#DFE7F1"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect Color="#334155" BlurRadius="14" ShadowDepth="2" Opacity="0.07"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="QuickActionButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#F8FAFC"/>
+            <Setter Property="BorderBrush" Value="#DBEAFE"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ActionBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="10"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ActionBorder" Property="Background" Value="#EFF6FF"/>
+                                <Setter TargetName="ActionBorder" Property="BorderBrush" Value="#93C5FD"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ActionBorder" Property="Opacity" Value="0.82"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <Grid Margin="20,18,20,22">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Greeting and live status -->
+            <Grid Grid.Row="0" Margin="4,0,4,14">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="{Binding Greeting}" FontSize="25" FontWeight="Bold" Foreground="#0F172A"/>
+                    <TextBlock Text="إليك ملخص أداء المحل اليوم" Margin="0,4,0,0"
+                               FontSize="13" Foreground="#64748B"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Background="#ECFDF5" CornerRadius="9" Padding="12,8" Margin="0,0,8,0">
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse Width="7" Height="7" Fill="#10B981" Margin="0,0,7,0"/>
+                            <TextBlock Text="{Binding CashboxBalance, StringFormat='رصيد الخزائن  {0:N0} ج.م'}"
+                                       FontSize="11" Foreground="#047857" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                    <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButtonStyle}"
+                            Padding="13,7">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="↻" FontSize="16" Margin="0,0,6,0"/>
+                            <TextBlock Text="تحديث"/>
+                        </StackPanel>
+                    </Button>
+                    <TextBlock Text="{Binding LastUpdatedText}" FontSize="10" Foreground="#94A3B8"
+                               VerticalAlignment="Center" Margin="8,0,0,0"/>
+                </StackPanel>
+            </Grid>
+
+            <Border Grid.Row="1"
+                    Visibility="{Binding StatusMessage, Converter={StaticResource StringToVisibilityConverter}}"
+                    Background="#FEF2F2" BorderBrush="#FECACA" BorderThickness="1"
+                    CornerRadius="8" Padding="12,9" Margin="0,0,0,12">
+                <TextBlock Text="{Binding StatusMessage}" Foreground="#B91C1C" TextWrapping="Wrap"/>
+            </Border>
+
+            <ProgressBar Grid.Row="1" IsIndeterminate="True" Height="3" VerticalAlignment="Bottom"
+                         Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}"
+                         Foreground="#2563EB"/>
+
+            <!-- Primary KPIs -->
+            <Grid Grid.Row="2" Margin="0,0,0,16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="12"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="12"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="12"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Style="{StaticResource DashboardCardStyle}" Padding="16,15" MinHeight="138">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="52"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="مبيعات اليوم" FontSize="13" Foreground="#475569"/>
+                            <TextBlock Text="{Binding TodaySales, StringFormat='{}{0:N0} ج.م'}" Margin="0,11,0,0"
+                                       FontSize="25" FontWeight="Bold" Foreground="#0F172A"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                <TextBlock Text="↗" Foreground="#16A34A" FontWeight="Bold" Margin="0,0,4,0"/>
+                                <TextBlock Text="{Binding SalesChangePercentage, StringFormat='{}{0:+0.0;-0.0;0.0}% عن أمس'}"
+                                           FontSize="11" Foreground="#16A34A"/>
+                            </StackPanel>
+                        </StackPanel>
+                        <Border Grid.Column="1" Width="48" Height="48" CornerRadius="24" Background="#E8F2FF"
+                                VerticalAlignment="Top">
+                            <TextBlock Text="▱" FontSize="25" Foreground="#2563EB"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="2" Style="{StaticResource DashboardCardStyle}" Padding="16,15" MinHeight="138">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="52"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="صافي ربح اليوم" FontSize="13" Foreground="#475569"/>
+                            <TextBlock Text="{Binding EstimatedTodayProfit, StringFormat='{}{0:N0} ج.م'}" Margin="0,11,0,0"
+                                       FontSize="25" FontWeight="Bold" Foreground="#0F172A"/>
+                            <TextBlock Text="تقديري بعد التكلفة والمصروفات" Margin="0,12,0,0"
+                                       FontSize="10.5" Foreground="#16A34A"/>
+                        </StackPanel>
+                        <Border Grid.Column="1" Width="48" Height="48" CornerRadius="24" Background="#E7F8F1"
+                                VerticalAlignment="Top">
+                            <TextBlock Text="↗" FontSize="27" FontWeight="Bold" Foreground="#059669"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="4" Style="{StaticResource DashboardCardStyle}" Padding="16,15" MinHeight="138">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="52"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="قيمة المخزون" FontSize="13" Foreground="#475569"/>
+                            <TextBlock Text="{Binding InventoryValue, StringFormat='{}{0:N0} ج.م'}" Margin="0,11,0,0"
+                                       FontSize="25" FontWeight="Bold" Foreground="#0F172A"/>
+                            <TextBlock Text="بالتكلفة المتوسطة الحالية" Margin="0,12,0,0"
+                                       FontSize="10.5" Foreground="#64748B"/>
+                        </StackPanel>
+                        <Border Grid.Column="1" Width="48" Height="48" CornerRadius="24" Background="#EDE9FE"
+                                VerticalAlignment="Top">
+                            <TextBlock Text="◇" FontSize="27" Foreground="#7C3AED"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="6" Style="{StaticResource DashboardCardStyle}" Padding="16,15" MinHeight="138"
+                        BorderBrush="#FED7AA">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="52"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="أصناف منخفضة" FontSize="13" Foreground="#475569"/>
+                            <TextBlock Text="{Binding LowStockCount}" Margin="0,11,0,0"
+                                       FontSize="27" FontWeight="Bold" Foreground="#0F172A"/>
+                            <TextBlock Text="تحتاج متابعة وإعادة طلب" Margin="0,12,0,0"
+                                       FontSize="10.5" Foreground="#EA580C"/>
+                        </StackPanel>
+                        <Border Grid.Column="1" Width="48" Height="48" CornerRadius="24" Background="#FFF1E8"
+                                VerticalAlignment="Top">
+                            <TextBlock Text="!" FontSize="25" FontWeight="Bold" Foreground="#F97316"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- Charts -->
+            <Grid Grid.Row="3" Margin="0,0,0,16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="0.85*"/>
+                    <ColumnDefinition Width="14"/>
+                    <ColumnDefinition Width="1.15*"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Style="{StaticResource DashboardCardStyle}" Padding="17,15" MinHeight="280">
+                    <Grid>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                        <TextBlock Text="توزيع قيمة المخزون" FontSize="15" FontWeight="SemiBold" Foreground="#0F172A"/>
+                        <Grid Grid.Row="1" Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="1.05*"/><ColumnDefinition Width="0.95*"/></Grid.ColumnDefinitions>
+                            <charts:InventoryDonutChart ItemsSource="{Binding InventoryByCategory}"
+                                                        TotalValue="{Binding InventoryValue}"
+                                                        MinHeight="200"/>
+                            <ItemsControl Grid.Column="1" ItemsSource="{Binding InventoryByCategory}"
+                                          AlternationCount="4" VerticalAlignment="Center" Margin="10,0,0,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,7">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="16"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Ellipse Width="9" Height="9" HorizontalAlignment="Right">
+                                                <Ellipse.Style>
+                                                    <Style TargetType="Ellipse">
+                                                        <Setter Property="Fill" Value="#2563EB"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding (ItemsControl.AlternationIndex), RelativeSource={RelativeSource AncestorType=ContentPresenter}}" Value="1">
+                                                                <Setter Property="Fill" Value="#16A34A"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding (ItemsControl.AlternationIndex), RelativeSource={RelativeSource AncestorType=ContentPresenter}}" Value="2">
+                                                                <Setter Property="Fill" Value="#F97316"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding (ItemsControl.AlternationIndex), RelativeSource={RelativeSource AncestorType=ContentPresenter}}" Value="3">
+                                                                <Setter Property="Fill" Value="#7C3AED"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Ellipse.Style>
+                                            </Ellipse>
+                                            <TextBlock Grid.Column="1" Text="{Binding CategoryName}" FontSize="11.5" Foreground="#475569"/>
+                                            <TextBlock Grid.Column="2" Text="{Binding Percentage, StringFormat='{}{0:0.#}%'}"
+                                                       FontSize="11.5" FontWeight="SemiBold" Foreground="#0F172A"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="2" Style="{StaticResource DashboardCardStyle}" Padding="17,15" MinHeight="280">
+                    <Grid>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <TextBlock Text="المبيعات والمصروفات — آخر 7 أيام" FontSize="15" FontWeight="SemiBold" Foreground="#0F172A"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Rectangle Width="12" Height="5" RadiusX="2" Fill="#2563EB" Margin="0,0,5,0"/>
+                                <TextBlock Text="المبيعات" FontSize="10" Foreground="#64748B" Margin="0,0,12,0"/>
+                                <Rectangle Width="12" Height="5" RadiusX="2" Fill="#F97316" Margin="0,0,5,0"/>
+                                <TextBlock Text="المصروفات" FontSize="10" Foreground="#64748B"/>
+                            </StackPanel>
+                        </Grid>
+                        <charts:WeeklyTrendChart Grid.Row="1" ItemsSource="{Binding WeeklyTrend}" MinHeight="210" Margin="0,8,0,0"/>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- Operations, activity and alerts -->
+            <Grid Grid.Row="4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="0.72*"/>
+                    <ColumnDefinition Width="14"/>
+                    <ColumnDefinition Width="0.86*"/>
+                    <ColumnDefinition Width="14"/>
+                    <ColumnDefinition Width="1.18*"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Style="{StaticResource DashboardCardStyle}" Padding="15" MinHeight="275">
+                    <Grid>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                        <TextBlock Text="إجراءات سريعة" FontSize="15" FontWeight="SemiBold" Foreground="#0F172A"/>
+                        <UniformGrid Grid.Row="1" Columns="2" Rows="2" Margin="0,14,0,0">
+                            <Button Style="{StaticResource QuickActionButtonStyle}" Margin="0,0,5,5"
+                                    Command="{Binding DataContext.NavigateByKeyCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    CommandParameter="SalesInvoices">
+                                <StackPanel>
+                                    <TextBlock Text="🛒" FontSize="25" Foreground="#2563EB" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="بيع جديد" Margin="0,8,0,0" FontWeight="SemiBold" Foreground="#1E3A8A" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource QuickActionButtonStyle}" Margin="5,0,0,5"
+                                    Background="#F0FDF4" BorderBrush="#BBF7D0"
+                                    Command="{Binding DataContext.NavigateByKeyCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    CommandParameter="PurchaseInvoices">
+                                <StackPanel>
+                                    <TextBlock Text="▤" FontSize="26" Foreground="#16A34A" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="فاتورة شراء" Margin="0,8,0,0" FontWeight="SemiBold" Foreground="#166534" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource QuickActionButtonStyle}" Margin="0,5,5,0"
+                                    Background="#F5F3FF" BorderBrush="#DDD6FE"
+                                    Command="{Binding DataContext.NavigateByKeyCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    CommandParameter="InventoryAddProduct">
+                                <StackPanel>
+                                    <TextBlock Text="◇" FontSize="28" Foreground="#7C3AED" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="إضافة منتج" Margin="0,8,0,0" FontWeight="SemiBold" Foreground="#5B21B6" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource QuickActionButtonStyle}" Margin="5,5,0,0"
+                                    Background="#FFF7ED" BorderBrush="#FED7AA"
+                                    Command="{Binding DataContext.NavigateByKeyCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    CommandParameter="Inventory">
+                                <StackPanel>
+                                    <TextBlock Text="▥" FontSize="26" Foreground="#EA580C" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="جرد سريع" Margin="0,8,0,0" FontWeight="SemiBold" Foreground="#9A3412" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </UniformGrid>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="2" Style="{StaticResource DashboardCardStyle}" Padding="15" MinHeight="275">
+                    <Grid>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                        <TextBlock Text="آخر العمليات" FontSize="15" FontWeight="SemiBold" Foreground="#0F172A"/>
+                        <ItemsControl Grid.Row="1" ItemsSource="{Binding RecentOperations}" Margin="0,7,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border BorderBrush="#EEF2F7" BorderThickness="0,0,0,1" Padding="2,8">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="40"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border Width="32" Height="32" CornerRadius="8" HorizontalAlignment="Right">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Background" Value="#E8F2FF"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding OperationType}" Value="purchase">
+                                                                <Setter Property="Background" Value="#DCFCE7"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding OperationType}" Value="expense">
+                                                                <Setter Property="Background" Value="#FFEDD5"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="16">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Text" Value="▱"/>
+                                                            <Setter Property="Foreground" Value="#2563EB"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding OperationType}" Value="purchase">
+                                                                    <Setter Property="Text" Value="▤"/>
+                                                                    <Setter Property="Foreground" Value="#16A34A"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding OperationType}" Value="expense">
+                                                                    <Setter Property="Text" Value="−"/>
+                                                                    <Setter Property="Foreground" Value="#EA580C"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Title}" FontSize="11" FontWeight="SemiBold" Foreground="#1E293B" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding Subtitle}" FontSize="10" Foreground="#64748B" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="8,0,0,0">
+                                                <TextBlock Text="{Binding Amount, StringFormat='{}{0:N0} ج.م'}" FontSize="10.5" FontWeight="SemiBold" Foreground="#334155" HorizontalAlignment="Left"/>
+                                                <TextBlock Text="{Binding OccurredAt, StringFormat='{}{0:hh:mm tt}'}" FontSize="9.5" Foreground="#94A3B8" HorizontalAlignment="Left" Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="4" Style="{StaticResource DashboardCardStyle}" Padding="15" MinHeight="275">
+                    <Grid>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <TextBlock Text="تنبيهات المخزون" FontSize="15" FontWeight="SemiBold" Foreground="#0F172A"/>
+                            <Border Grid.Column="1" Background="#FFF7ED" CornerRadius="10" Padding="9,3">
+                                <TextBlock Text="{Binding LowStockCount, StringFormat='{}{0} صنف'}" Foreground="#EA580C" FontSize="10.5" FontWeight="SemiBold"/>
+                            </Border>
+                        </Grid>
+                        <DataGrid Grid.Row="1" ItemsSource="{Binding LowStockProducts}"
+                                  Style="{StaticResource AppDataGridStyle}" Margin="0,10,0,0"
+                                  HeadersVisibility="Column" MinHeight="178" MaxHeight="215">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="المنتج" Binding="{Binding ProductName}" Width="*"/>
+                                <DataGridTextColumn Header="الرصيد" Binding="{Binding CurrentQuantity, StringFormat=N2}" Width="75"/>
+                                <DataGridTextColumn Header="حد الطلب" Binding="{Binding MinimumQuantity, StringFormat=N2}" Width="80"/>
+                                <DataGridTextColumn Header="الوحدة" Binding="{Binding BaseUnitName}" Width="70"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <Button Grid.Row="2" Content="عرض كل التنبيهات ←" HorizontalAlignment="Left" Margin="0,9,0,0"
+                                Style="{StaticResource SecondaryButtonStyle}" Padding="10,5"
+                                Command="{Binding DataContext.NavigateByKeyCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                CommandParameter="Alerts"/>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- Secondary financial snapshot -->
+            <Border Grid.Row="5" Margin="0,14,0,0" Background="#0F2747" CornerRadius="11" Padding="16,12">
                 <Grid>
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                    <StackPanel>
-                        <TextBlock Text="{Binding Greeting}" FontSize="25" FontWeight="Bold" Foreground="White"/>
-                        <TextBlock Text="دي نظرة سريعة على حركة المحل والمخزون والحسابات"
-                                   FontSize="13" Foreground="#DBEAFE" Margin="0,5,0,0"/>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/><ColumnDefinition Width="1"/>
+                        <ColumnDefinition Width="*"/><ColumnDefinition Width="1"/>
+                        <ColumnDefinition Width="*"/><ColumnDefinition Width="1"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" HorizontalAlignment="Center">
+                        <TextBlock Text="تحصيلات اليوم" Foreground="#94A3B8" FontSize="10"/>
+                        <TextBlock Text="{Binding TodayCollections, StringFormat='{}{0:N0} ج.م'}" Foreground="White" FontSize="14" FontWeight="SemiBold" Margin="0,3,0,0"/>
                     </StackPanel>
-                    <StackPanel Grid.Column="1" HorizontalAlignment="Left">
-                        <Button Content="تحديث البيانات" Command="{Binding RefreshCommand}"
-                                Style="{StaticResource LightButtonStyle}"/>
-                        <TextBlock Text="{Binding LastUpdatedText}" Foreground="#DBEAFE"
-                                   FontSize="11" HorizontalAlignment="Center" Margin="0,5,0,0"/>
+                    <Border Grid.Column="1" Background="#334C6B"/>
+                    <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+                        <TextBlock Text="مصروفات اليوم" Foreground="#94A3B8" FontSize="10"/>
+                        <TextBlock Text="{Binding TodayExpenses, StringFormat='{}{0:N0} ج.م'}" Foreground="White" FontSize="14" FontWeight="SemiBold" Margin="0,3,0,0"/>
+                    </StackPanel>
+                    <Border Grid.Column="3" Background="#334C6B"/>
+                    <StackPanel Grid.Column="4" HorizontalAlignment="Center">
+                        <TextBlock Text="مديونية العملاء" Foreground="#94A3B8" FontSize="10"/>
+                        <TextBlock Text="{Binding CustomerReceivables, StringFormat='{}{0:N0} ج.م'}" Foreground="White" FontSize="14" FontWeight="SemiBold" Margin="0,3,0,0"/>
+                    </StackPanel>
+                    <Border Grid.Column="5" Background="#334C6B"/>
+                    <StackPanel Grid.Column="6" HorizontalAlignment="Center">
+                        <TextBlock Text="مستحقات الموردين" Foreground="#94A3B8" FontSize="10"/>
+                        <TextBlock Text="{Binding SupplierPayables, StringFormat='{}{0:N0} ج.م'}" Foreground="White" FontSize="14" FontWeight="SemiBold" Margin="0,3,0,0"/>
                     </StackPanel>
                 </Grid>
             </Border>
-
-            <Border Visibility="{Binding StatusMessage, Converter={StaticResource StringToVisibilityConverter}}"
-                    Background="#FEF2F2" CornerRadius="7" Padding="12,8" Margin="0,0,0,14">
-                <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource ErrorBrush}" TextWrapping="Wrap"/>
-            </Border>
-
-            <ProgressBar IsIndeterminate="True" Height="3" Margin="0,0,0,12"
-                         Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}"
-                         Foreground="{StaticResource PrimaryBrush}"/>
-
-            <UniformGrid Columns="3" Rows="2" Margin="0,0,0,16">
-                <Border Style="{StaticResource KpiCardStyle}" Margin="0,0,8,8">
-                    <Grid>
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="48"/></Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock Text="مبيعات اليوم" Foreground="{StaticResource MutedBrush}"/>
-                            <TextBlock Text="{Binding TodaySales, StringFormat='{}{0:N2} ج.م'}" Style="{StaticResource KpiValueStyle}" Foreground="{StaticResource SuccessBrush}"/>
-                            <TextBlock Text="{Binding SalesInvoiceCount, StringFormat='{}{0} فاتورة بيع'}" FontSize="11" Foreground="{StaticResource MutedBrush}"/>
-                        </StackPanel>
-                        <Border Grid.Column="1" Style="{StaticResource KpiIconSuccessStyle}"><TextBlock Text="↗" FontSize="23" Foreground="{StaticResource SuccessBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
-                    </Grid>
-                </Border>
-                <Border Style="{StaticResource KpiCardStyle}" Margin="4,0,4,8">
-                    <Grid>
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="48"/></Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock Text="تحصيلات اليوم" Foreground="{StaticResource MutedBrush}"/>
-                            <TextBlock Text="{Binding TodayCollections, StringFormat='{}{0:N2} ج.م'}" Style="{StaticResource KpiValueStyle}" Foreground="{StaticResource InfoBrush}"/>
-                            <TextBlock Text="نقدي ومدفوعات العملاء" FontSize="11" Foreground="{StaticResource MutedBrush}"/>
-                        </StackPanel>
-                        <Border Grid.Column="1" Style="{StaticResource KpiIconInfoStyle}"><TextBlock Text="↓" FontSize="23" Foreground="{StaticResource InfoBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
-                    </Grid>
-                </Border>
-                <Border Style="{StaticResource KpiCardStyle}" Margin="8,0,0,8">
-                    <Grid>
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="48"/></Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock Text="مصروفات اليوم" Foreground="{StaticResource MutedBrush}"/>
-                            <TextBlock Text="{Binding TodayExpenses, StringFormat='{}{0:N2} ج.م'}" Style="{StaticResource KpiValueStyle}" Foreground="{StaticResource ErrorBrush}"/>
-                            <TextBlock Text="إجمالي المصروفات المسجلة" FontSize="11" Foreground="{StaticResource MutedBrush}"/>
-                        </StackPanel>
-                        <Border Grid.Column="1" Style="{StaticResource KpiIconDangerStyle}"><TextBlock Text="↑" FontSize="23" Foreground="{StaticResource ErrorBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
-                    </Grid>
-                </Border>
-                <Border Style="{StaticResource KpiCardStyle}" Margin="0,4,8,0">
-                    <StackPanel>
-                        <TextBlock Text="رصيد الخزائن" Foreground="{StaticResource MutedBrush}"/>
-                        <TextBlock Text="{Binding CashboxBalance, StringFormat='{}{0:N2} ج.م'}" Style="{StaticResource KpiValueStyle}" Foreground="{StaticResource PrimaryBrush}"/>
-                        <TextBlock Text="الرصيد الحالي لكل الخزائن النشطة" FontSize="11" Foreground="{StaticResource MutedBrush}"/>
-                    </StackPanel>
-                </Border>
-                <Border Style="{StaticResource KpiCardStyle}" Margin="4,4,4,0">
-                    <StackPanel>
-                        <TextBlock Text="مديونية العملاء" Foreground="{StaticResource MutedBrush}"/>
-                        <TextBlock Text="{Binding CustomerReceivables, StringFormat='{}{0:N2} ج.م'}" Style="{StaticResource KpiValueStyle}" Foreground="{StaticResource WarningBrush}"/>
-                        <TextBlock Text="مبالغ مستحقة للمحل" FontSize="11" Foreground="{StaticResource MutedBrush}"/>
-                    </StackPanel>
-                </Border>
-                <Border Style="{StaticResource KpiCardStyle}" Margin="8,4,0,0">
-                    <StackPanel>
-                        <TextBlock Text="مستحقات الموردين" Foreground="{StaticResource MutedBrush}"/>
-                        <TextBlock Text="{Binding SupplierPayables, StringFormat='{}{0:N2} ج.م'}" Style="{StaticResource KpiValueStyle}" Foreground="{StaticResource ErrorBrush}"/>
-                        <TextBlock Text="مبالغ واجبة السداد" FontSize="11" Foreground="{StaticResource MutedBrush}"/>
-                    </StackPanel>
-                </Border>
-            </UniformGrid>
-
-            <Grid>
-                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="14"/><ColumnDefinition Width="360"/></Grid.ColumnDefinitions>
-                <Border Grid.Column="0" Style="{StaticResource CardStyle}" Padding="16">
-                    <DockPanel>
-                        <Grid DockPanel.Dock="Top" Margin="0,0,0,10">
-                            <TextBlock Text="منتجات وصلت لحد الطلب" Style="{StaticResource SectionHeaderStyle}" Margin="0"/>
-                            <Border HorizontalAlignment="Left" Background="#FFF7ED" CornerRadius="10" Padding="10,3">
-                                <TextBlock Text="{Binding LowStockCount, StringFormat='{}{0} منتج'}" Foreground="{StaticResource WarningBrush}" FontWeight="SemiBold"/>
-                            </Border>
-                        </Grid>
-                        <DataGrid ItemsSource="{Binding LowStockProducts}" Style="{StaticResource AppDataGridStyle}" MinHeight="180">
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="المنتج" Binding="{Binding ProductName}" Width="*"/>
-                                <DataGridTextColumn Header="الرصيد" Binding="{Binding CurrentQuantity, StringFormat=N3}" Width="100"/>
-                                <DataGridTextColumn Header="حد الطلب" Binding="{Binding MinimumQuantity, StringFormat=N3}" Width="100"/>
-                                <DataGridTextColumn Header="الوحدة" Binding="{Binding BaseUnitName}" Width="90"/>
-                            </DataGrid.Columns>
-                        </DataGrid>
-                    </DockPanel>
-                </Border>
-                <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="16">
-                    <StackPanel>
-                        <TextBlock Text="حالة البيانات" Style="{StaticResource SectionHeaderStyle}"/>
-                        <Grid Margin="0,0,0,14">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <TextBlock Text="المنتجات النشطة" Foreground="{StaticResource TextSecondaryBrush}"/>
-                            <TextBlock Grid.Column="1" Text="{Binding ActiveProductCount}" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>
-                        </Grid>
-                        <Grid Margin="0,0,0,14">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <TextBlock Text="العملاء النشطون" Foreground="{StaticResource TextSecondaryBrush}"/>
-                            <TextBlock Grid.Column="1" Text="{Binding ActiveCustomerCount}" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>
-                        </Grid>
-                        <Grid Margin="0,0,0,14">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <TextBlock Text="الموردون النشطون" Foreground="{StaticResource TextSecondaryBrush}"/>
-                            <TextBlock Grid.Column="1" Text="{Binding ActiveSupplierCount}" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>
-                        </Grid>
-                        <Grid>
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <TextBlock Text="فواتير شراء اليوم" Foreground="{StaticResource TextSecondaryBrush}"/>
-                            <TextBlock Grid.Column="1" Text="{Binding PurchaseInvoiceCount}" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>
-                        </Grid>
-                    </StackPanel>
-                </Border>
-            </Grid>
-        </StackPanel>
+        </Grid>
     </ScrollViewer>
 </UserControl>
