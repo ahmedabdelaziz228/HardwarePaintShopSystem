@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:hardware_paint_shop_mobile/core/state/view_status.dart';
 import 'package:hardware_paint_shop_mobile/core/widgets/error_banner.dart';
 import 'package:hardware_paint_shop_mobile/features/alerts/logic/alerts_cubit.dart';
 

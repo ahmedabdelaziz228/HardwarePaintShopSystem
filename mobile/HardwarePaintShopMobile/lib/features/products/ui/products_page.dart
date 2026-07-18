@@ -44,16 +44,17 @@ class _ProductsPageState extends State<ProductsPage> {
         backgroundColor: Colors.transparent,
         floatingActionButton: canCreate
             ? FloatingActionButton.extended(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute<void>(
-                    builder: (_) => const AddProductPage(),
-                  ),
-                ).then((_) {
-                  if (mounted) {
-                    context.read<ProductsCubit>().search(_searchController.text);
-                  }
-                }),
+                onPressed: () async {
+                  final productsCubit = context.read<ProductsCubit>();
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => const AddProductPage(),
+                    ),
+                  );
+                  if (!mounted) return;
+                  await productsCubit.search(_searchController.text);
+                },
                 icon: const Icon(Icons.add),
                 label: const Text('منتج'),
               )
