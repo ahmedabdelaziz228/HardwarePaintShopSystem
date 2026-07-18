@@ -252,7 +252,7 @@ public partial class CustomersViewModel : BaseViewModel
             var window = new CustomerStatementWindow
             {
                 DataContext = viewModel,
-                Owner = Application.Current.MainWindow
+                Owner = System.Windows.Application.Current.MainWindow
             };
             window.ShowDialog();
         }
