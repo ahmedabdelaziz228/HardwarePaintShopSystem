@@ -1,0 +1,32 @@
+# .NET build output
+**/bin/
+**/obj/
+artifacts/
+TestResults/
+
+# Flutter/Dart generated output
+mobile/**/.dart_tool/
+mobile/**/.flutter-plugins
+mobile/**/.flutter-plugins-dependencies
+mobile/**/.packages
+mobile/**/build/
+mobile/**/coverage/
+
+# IDE and local tooling
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+.static-check/
+.npm-cache/
+
+# Runtime files
+logs/
+*.log
+*.bak
+
+# Secrets: seller keys must never enter source control
+seller-tools/*.pem
+**/license-private-key.pem
+

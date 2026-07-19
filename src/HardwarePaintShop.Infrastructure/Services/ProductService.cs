@@ -2,8 +2,10 @@ using HardwarePaintShop.Application.Interfaces;
 using HardwarePaintShop.Application.Helpers;
 using HardwarePaintShop.Application.Models;
 using HardwarePaintShop.Domain.Entities;
+using HardwarePaintShop.Domain.Enums;
 using HardwarePaintShop.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace HardwarePaintShop.Infrastructure.Services;
 
@@ -11,13 +13,16 @@ public sealed class ProductService : IProductService
 {
     private readonly IDbContextFactory<AppDbContext> _dbFactory;
     private readonly IPermissionService _permissionService;
+    private readonly IAuthService? _authService;
 
     public ProductService(
         IDbContextFactory<AppDbContext> dbFactory,
-        IPermissionService permissionService)
+        IPermissionService permissionService,
+        IAuthService? authService = null)
     {
         _dbFactory = dbFactory;
         _permissionService = permissionService;
+        _authService = authService;
     }
 
     public async Task<List<ProductListItem>> SearchAsync(
@@ -73,6 +78,8 @@ public sealed class ProductService : IProductService
             .Include(p => p.ProductUnits).ThenInclude(pu => pu.Unit)
             .Include(p => p.ProductPrices).ThenInclude(pp => pp.ProductUnit)
             .Include(p => p.ProductBarcodes)
+            .Include(p => p.ProductCost)
+            .Include(p => p.StockMovements)
             .SingleOrDefaultAsync(p => p.Id == productId, cancellationToken)
             ?? throw new KeyNotFoundException("المنتج المطلوب غير موجود.");
 
@@ -89,6 +96,9 @@ public sealed class ProductService : IProductService
             IsSerialTracked = product.IsSerialTracked,
             IsActive = product.IsActive,
             Notes = product.Notes,
+            StockBaseQuantity = product.StockMovements.Sum(m => m.QuantityBaseUnit),
+            LastPurchasePriceBaseUnit = product.ProductCost?.LastPurchasePriceBaseUnit ?? 0,
+            AverageCostBaseUnit = product.ProductCost?.AverageCostBaseUnit ?? 0,
             Units = product.ProductUnits
                 .OrderByDescending(u => u.UnitId == product.BaseUnitId)
                 .ThenBy(u => u.Unit.Name)
@@ -191,6 +201,7 @@ public sealed class ProductService : IProductService
         }
 
         Product product;
+        var isNew = !request.Id.HasValue;
         if (request.Id.HasValue)
         {
             product = await db.Products
@@ -231,6 +242,56 @@ public sealed class ProductService : IProductService
         SynchronizeUnits(product, request);
         SynchronizePrices(product, request, db);
         SynchronizeBarcodes(product, request, db);
+
+        if (isNew)
+        {
+            if (request.OpeningCostBaseUnit > 0)
+            {
+                product.ProductCost = new ProductCost
+                {
+                    Id = Guid.NewGuid(),
+                    ProductId = product.Id,
+                    LastPurchasePriceBaseUnit = request.OpeningCostBaseUnit,
+                    AverageCostBaseUnit = request.OpeningCostBaseUnit,
+                    UpdatedAt = DateTime.UtcNow
+                };
+            }
+
+            if (request.OpeningQuantityBase > 0)
+            {
+                var baseProductUnit = product.ProductUnits.Single(u =>
+                    u.UnitId == request.BaseUnitId && u.IsActive);
+                db.StockMovements.Add(new StockMovement
+                {
+                    Id = Guid.NewGuid(),
+                    ProductId = product.Id,
+                    ProductUnitId = baseProductUnit.Id,
+                    QuantityBaseUnit = request.OpeningQuantityBase,
+                    MovementType = StockMovementType.OpeningBalance,
+                    ReferenceType = "ProductOpeningBalance",
+                    UserId = _authService?.CurrentUserId,
+                    Notes = "رصيد افتتاحي عند إنشاء المنتج",
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+
+            db.AuditLogs.Add(new AuditLog
+            {
+                Id = Guid.NewGuid(),
+                TableName = "Products",
+                RecordId = product.Id,
+                Action = AuditAction.Insert,
+                ChangedByUserId = _authService?.CurrentUserId,
+                NewValuesJson = JsonSerializer.Serialize(new
+                {
+                    product.Name,
+                    product.ProductCode,
+                    request.OpeningQuantityBase,
+                    request.OpeningCostBaseUnit
+                }),
+                CreatedAt = DateTime.UtcNow
+            });
+        }
 
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -344,6 +405,12 @@ public sealed class ProductService : IProductService
             throw new InvalidOperationException("الوحدة الأساسية مطلوبة.");
         if (request.MinStockBaseQuantity < 0)
             throw new InvalidOperationException("حد الطلب لا يمكن أن يكون سالبًا.");
+        if (request.OpeningQuantityBase < 0 || request.OpeningCostBaseUnit < 0)
+            throw new InvalidOperationException("الرصيد الافتتاحي والتكلفة لا يمكن أن يكونا سالبين.");
+        if (request.Id.HasValue && (request.OpeningQuantityBase != 0 || request.OpeningCostBaseUnit != 0))
+            throw new InvalidOperationException("الرصيد الافتتاحي يُسجل عند إنشاء المنتج فقط.");
+        if (request.IsSerialTracked && request.OpeningQuantityBase > 0)
+            throw new InvalidOperationException("المنتج المتتبع بالسيريال يُنشأ برصيد صفر، ثم تُسجل أرقام السيريال من فاتورة الشراء.");
 
         var units = request.Units.ToList();
         if (units.GroupBy(u => u.UnitId).Any(g => g.Count() > 1))

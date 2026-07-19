@@ -134,6 +134,81 @@ public sealed class PartyService : IPartyService
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<CustomerStatementData> GetCustomerStatementAsync(
+        Guid customerId,
+        DateTime from,
+        DateTime to,
+        CancellationToken cancellationToken = default)
+    {
+        if (to.Date < from.Date)
+            throw new InvalidOperationException("تاريخ نهاية كشف الحساب يسبق تاريخ البداية.");
+
+        var start = DateTime.SpecifyKind(from.Date, DateTimeKind.Utc);
+        var end = DateTime.SpecifyKind(to.Date.AddDays(1), DateTimeKind.Utc);
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        var customer = await db.Customers.AsNoTracking()
+            .SingleOrDefaultAsync(c => c.Id == customerId, cancellationToken)
+            ?? throw new KeyNotFoundException("العميل المطلوب غير موجود.");
+
+        var openingTransactions = await db.CustomerTransactions.AsNoTracking()
+            .Where(t => t.CustomerId == customerId && t.CreatedAt < start)
+            .Select(t => new { t.Direction, t.Amount })
+            .ToListAsync(cancellationToken);
+        var opening = openingTransactions.Sum(t => Signed(t.Direction, t.Amount));
+
+        var transactions = await db.CustomerTransactions.AsNoTracking()
+            .Where(t => t.CustomerId == customerId && t.CreatedAt >= start && t.CreatedAt < end)
+            .OrderBy(t => t.CreatedAt)
+            .ThenBy(t => t.Id)
+            .ToListAsync(cancellationToken);
+        var referenceIds = transactions.Where(t => t.ReferenceId.HasValue)
+            .Select(t => t.ReferenceId!.Value).Distinct().ToList();
+        var invoiceNumbers = referenceIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : await db.SalesInvoices.AsNoTracking()
+                .Where(i => referenceIds.Contains(i.Id))
+                .ToDictionaryAsync(i => i.Id, i => i.InvoiceNo, cancellationToken);
+
+        var running = opening;
+        var lines = new List<CustomerStatementLine>();
+        foreach (var transaction in transactions)
+        {
+            var debit = transaction.Direction.Equals("debit", StringComparison.OrdinalIgnoreCase)
+                ? transaction.Amount : 0;
+            var credit = transaction.Direction.Equals("credit", StringComparison.OrdinalIgnoreCase)
+                ? transaction.Amount : 0;
+            running += debit - credit;
+            var reference = transaction.ReferenceId.HasValue &&
+                            invoiceNumbers.TryGetValue(transaction.ReferenceId.Value, out var invoiceNo)
+                ? invoiceNo
+                : transaction.ReferenceId.HasValue
+                    ? transaction.ReferenceId.Value.ToString("N")[..8]
+                    : null;
+            lines.Add(new CustomerStatementLine(
+                transaction.Id,
+                transaction.CreatedAt.ToLocalTime(),
+                TranslateTransactionType(transaction.TransactionType),
+                transaction.Notes ?? TranslateTransactionType(transaction.TransactionType),
+                reference,
+                debit,
+                credit,
+                running));
+        }
+
+        return new CustomerStatementData
+        {
+            CustomerId = customer.Id,
+            CustomerName = customer.Name,
+            Phone = customer.Phone,
+            Address = customer.Address,
+            From = from.Date,
+            To = to.Date,
+            OpeningBalance = opening,
+            ClosingBalance = running,
+            Lines = lines
+        };
+    }
+
     public async Task<List<SupplierListItem>> SearchSuppliersAsync(
         PartySearchCriteria criteria,
         CancellationToken cancellationToken = default)
@@ -240,4 +315,16 @@ public sealed class PartyService : IPartyService
 
     private static string? Normalize(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static decimal Signed(string direction, decimal amount)
+        => direction.Equals("credit", StringComparison.OrdinalIgnoreCase) ? -amount : amount;
+
+    private static string TranslateTransactionType(string type) => type switch
+    {
+        "SalesInvoice" => "فاتورة بيع",
+        "SalesPayment" => "دفعة فاتورة",
+        "CustomerCollection" => "تحصيل من العميل",
+        "SalesReturn" => "مرتجع بيع",
+        _ => type
+    };
 }

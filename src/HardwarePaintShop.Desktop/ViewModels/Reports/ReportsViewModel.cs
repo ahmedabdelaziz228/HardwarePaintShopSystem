@@ -55,6 +55,8 @@ public partial class ReportsViewModel : BaseViewModel
         Add(csv, "ملخص", "صافي المبيعات", Report.NetSales);
         Add(csv, "ملخص", "المشتريات", Report.Purchases - Report.PurchaseReturns);
         Add(csv, "ملخص", "المصروفات", Report.Expenses);
+        Add(csv, "ملخص", "تكلفة البضاعة المباعة بعد المرتجعات", Report.EstimatedCostOfSales);
+        Add(csv, "ملخص", "مجمل الربح", Report.EstimatedGrossProfit);
         Add(csv, "ملخص", "صافي الربح التقديري", Report.EstimatedNetProfit);
         Add(csv, "ملخص", "مديونية العملاء", Report.CustomerDebt);
         Add(csv, "ملخص", "مستحقات الموردين", Report.SupplierDebt);
@@ -62,9 +64,9 @@ public partial class ReportsViewModel : BaseViewModel
         csv.AppendLine(); csv.AppendLine("المبيعات اليومية;التاريخ;عدد الفواتير;المبيعات;المدفوع;المتبقي");
         foreach (var row in Report.DailySales)
             csv.AppendLine($";{row.Date:yyyy-MM-dd};{row.InvoiceCount};{N(row.Sales)};{N(row.Paid)};{N(row.Remaining)}");
-        csv.AppendLine(); csv.AppendLine("الأصناف الأكثر مبيعًا;الصنف;الكمية الأساسية;الإيراد");
+        csv.AppendLine(); csv.AppendLine("الأصناف الأكثر مبيعًا;الصنف;الكمية الأساسية;الإيراد;التكلفة;مجمل الربح");
         foreach (var row in Report.TopProducts)
-            csv.AppendLine($";{Q(row.ProductName)};{N(row.QuantityBase)};{N(row.Revenue)}");
+            csv.AppendLine($";{Q(row.ProductName)};{N(row.QuantityBase)};{N(row.Revenue)};{N(row.Cost)};{N(row.GrossProfit)}");
         csv.AppendLine(); csv.AppendLine("أرصدة العملاء;العميل;الهاتف;الرصيد;حد الائتمان");
         foreach (var row in Report.CustomerBalances)
             csv.AppendLine($";{Q(row.PartyName)};{Q(row.Phone)};{N(row.Balance)};{N(row.Limit)}");
@@ -101,12 +103,14 @@ public partial class ReportsViewModel : BaseViewModel
         AddRow(group, "صافي المبيعات", Report.NetSales);
         AddRow(group, "صافي المشتريات", Report.Purchases - Report.PurchaseReturns);
         AddRow(group, "المصروفات", Report.Expenses);
+        AddRow(group, "تكلفة البضاعة المباعة", Report.EstimatedCostOfSales);
+        AddRow(group, "مجمل الربح", Report.EstimatedGrossProfit);
         AddRow(group, "الربح التقديري", Report.EstimatedNetProfit);
         AddRow(group, "مديونية العملاء", Report.CustomerDebt);
         AddRow(group, "مستحقات الموردين", Report.SupplierDebt);
         AddRow(group, "قيمة المخزون", Report.StockValue);
         document.Blocks.Add(table);
-        document.Blocks.Add(new Paragraph(new Run("ملاحظة: الربح تقديري بناءً على متوسط التكلفة الحالي.")) { FontStyle = FontStyles.Italic, Foreground = Brushes.DimGray });
+        document.Blocks.Add(new Paragraph(new Run("التكلفة والربح محفوظان وقت ترحيل كل فاتورة وفق متوسط التكلفة وقت البيع.")) { FontStyle = FontStyles.Italic, Foreground = Brushes.DimGray });
         return document;
     }
 

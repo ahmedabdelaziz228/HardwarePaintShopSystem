@@ -1,6 +1,6 @@
 # Seller-only licensing files
 
-Keep `license-private-key.pem` private and never copy the `seller-tools` folder to a customer machine or public repository.
+Copy `license-private-key.pem` into this folder only on the offline seller machine. The file is ignored by Git. Keep it private and never copy it to a customer machine, source archive, cloud build, or public repository.
 
 Generate a permanent license:
 

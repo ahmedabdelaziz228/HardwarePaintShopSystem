@@ -225,6 +225,7 @@ public class InvoiceConfiguration :
 
     public void Configure(EntityTypeBuilder<SalesInvoiceItem> builder)
     {
+        builder.Property(x => x.GrossProfit).HasPrecision(18, 2);
         builder.HasOne(x => x.SalesInvoice)
             .WithMany(x => x.Items)
             .HasForeignKey(x => x.SalesInvoiceId)

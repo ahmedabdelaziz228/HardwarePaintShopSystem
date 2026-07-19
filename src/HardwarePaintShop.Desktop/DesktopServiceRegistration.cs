@@ -78,6 +78,7 @@ public static class DesktopServiceRegistration
         services.AddTransient<ProductsViewModel>();
         services.AddTransient<PriceInquiryViewModel>();
         services.AddTransient<CustomersViewModel>();
+        services.AddTransient<CustomerStatementViewModel>();
         services.AddTransient<SuppliersViewModel>();
         services.AddTransient<CashboxesViewModel>();
         services.AddTransient<PurchaseInvoicesViewModel>();

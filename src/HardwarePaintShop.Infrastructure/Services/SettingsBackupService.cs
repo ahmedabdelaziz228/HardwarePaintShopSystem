@@ -29,6 +29,12 @@ public sealed class SettingsBackupService : ISettingsBackupService
             ShopPhone = Get(values, "Shop.Phone", _configuration["AppSettings:ShopPhone"] ?? string.Empty),
             ShopAddress = Get(values, "Shop.Address", _configuration["AppSettings:ShopAddress"] ?? string.Empty),
             TaxNumber = Get(values, "Shop.TaxNumber", string.Empty),
+            CommercialRegistration = Get(values, "Shop.CommercialRegistration", string.Empty),
+            InvoiceTitle = Get(values, "Invoice.Title", "فاتورة بيع"),
+            InvoiceFooter = Get(values, "Invoice.Footer", "شكرًا لتعاملكم معنا"),
+            CurrencySymbol = Get(values, "Invoice.Currency", "ج.م"),
+            LogoPath = Get(values, "Invoice.LogoPath", string.Empty),
+            InvoicePaperSize = Get(values, "Invoice.PaperSize", "A4"),
             ThermalPrinterWidth = GetInt(values, "Print.ThermalWidth", GetConfigurationInt("AppSettings:ThermalPrinterWidth", 80)),
             BackupFolder = Get(values, "Backup.Folder", _configuration["AppSettings:BackupFolder"] ?? @"C:\ShopBackups"),
             AutoBackupEnabled = GetBool(values, "Backup.AutoEnabled", GetConfigurationBool("AppSettings:AutoBackupEnabled", true)),
@@ -39,6 +45,10 @@ public sealed class SettingsBackupService : ISettingsBackupService
     public async Task SaveSettingsAsync(ShopSettings settings, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(settings.ShopName)) throw new InvalidOperationException("اسم المحل مطلوب.");
+        if (string.IsNullOrWhiteSpace(settings.InvoiceTitle)) throw new InvalidOperationException("عنوان الفاتورة مطلوب.");
+        if (string.IsNullOrWhiteSpace(settings.CurrencySymbol)) throw new InvalidOperationException("رمز العملة مطلوب.");
+        if (settings.InvoicePaperSize is not ("A4" or "80mm" or "58mm"))
+            throw new InvalidOperationException("مقاس الفاتورة يجب أن يكون A4 أو 80mm أو 58mm.");
         if (settings.ThermalPrinterWidth is not (58 or 80)) throw new InvalidOperationException("عرض الطابعة الحرارية يجب أن يكون 58 أو 80 مم.");
         if (settings.BackupRetentionDays < 1) throw new InvalidOperationException("مدة الاحتفاظ يجب أن تكون يومًا واحدًا على الأقل.");
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
@@ -46,6 +56,12 @@ public sealed class SettingsBackupService : ISettingsBackupService
         await PutAsync(db, "Shop.Phone", settings.ShopPhone?.Trim(), "هاتف المحل", cancellationToken);
         await PutAsync(db, "Shop.Address", settings.ShopAddress?.Trim(), "عنوان المحل", cancellationToken);
         await PutAsync(db, "Shop.TaxNumber", settings.TaxNumber?.Trim(), "الرقم الضريبي", cancellationToken);
+        await PutAsync(db, "Shop.CommercialRegistration", settings.CommercialRegistration?.Trim(), "السجل التجاري", cancellationToken);
+        await PutAsync(db, "Invoice.Title", settings.InvoiceTitle?.Trim(), "عنوان مستند البيع", cancellationToken);
+        await PutAsync(db, "Invoice.Footer", settings.InvoiceFooter?.Trim(), "تذييل الفاتورة", cancellationToken);
+        await PutAsync(db, "Invoice.Currency", settings.CurrencySymbol?.Trim(), "رمز عملة الفاتورة", cancellationToken);
+        await PutAsync(db, "Invoice.LogoPath", settings.LogoPath?.Trim(), "شعار الفاتورة", cancellationToken);
+        await PutAsync(db, "Invoice.PaperSize", settings.InvoicePaperSize, "مقاس ورق الفاتورة", cancellationToken);
         await PutAsync(db, "Print.ThermalWidth", settings.ThermalPrinterWidth.ToString(), "عرض ورق الطابعة الحرارية", cancellationToken);
         await PutAsync(db, "Backup.Folder", settings.BackupFolder?.Trim(), "مجلد النسخ الاحتياطي", cancellationToken);
         await PutAsync(db, "Backup.AutoEnabled", settings.AutoBackupEnabled.ToString(), "نسخ احتياطي تلقائي", cancellationToken);

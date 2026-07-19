@@ -8,6 +8,17 @@ namespace HardwarePaintShop.Infrastructure.Data;
 public class DatabaseInitializer : IDatabaseInitializer
 {
     private static readonly string[] RoleNames = { "Owner", "Admin", "Cashier", "StoreKeeper" };
+    private static readonly (string Name, string ShortName)[] StandardUnits =
+    {
+        ("قطعة", "قطعة"),
+        ("كيلوجرام", "كجم"),
+        ("جرام", "جم"),
+        ("متر", "م"),
+        ("سنتيمتر", "سم"),
+        ("شكارة", "شكارة"),
+        ("لفة", "لفة"),
+        ("لتر", "لتر")
+    };
 
     private readonly IDbContextFactory<AppDbContext> _dbFactory;
     private readonly IPasswordHasher _passwordHasher;
@@ -38,6 +49,38 @@ public class DatabaseInitializer : IDatabaseInitializer
                     UpdatedAt = DateTime.UtcNow
                 }, cancellationToken);
             }
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        foreach (var (name, shortName) in StandardUnits)
+        {
+            if (!await db.Units.AnyAsync(u => u.Name == name, cancellationToken))
+            {
+                await db.Units.AddAsync(new Unit
+                {
+                    Id = Guid.NewGuid(),
+                    Name = name,
+                    ShortName = shortName,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                }, cancellationToken);
+            }
+        }
+
+        if (!await db.PriceGroups.AnyAsync(cancellationToken))
+        {
+            await db.PriceGroups.AddAsync(new PriceGroup
+            {
+                Id = Guid.NewGuid(),
+                Name = "قطاعي",
+                Description = "سعر البيع الافتراضي",
+                IsDefault = true,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            }, cancellationToken);
         }
 
         await db.SaveChangesAsync(cancellationToken);

@@ -88,6 +88,38 @@ public class ProductModuleTests
         request.Barcodes.Should().ContainSingle();
     }
 
+    [Fact]
+    public void ProductSaveRequest_CarriesSingleWarehouseOpeningBalance()
+    {
+        var request = new ProductSaveRequest
+        {
+            Name = "دهان بلاستيك",
+            BaseUnitId = Guid.NewGuid(),
+            OpeningQuantityBase = 24,
+            OpeningCostBaseUnit = 110
+        };
+
+        request.OpeningQuantityBase.Should().Be(24);
+        request.OpeningCostBaseUnit.Should().Be(110);
+    }
+
+    [Theory]
+    [InlineData(20, 5, "متوفر")]
+    [InlineData(3, 5, "منخفض")]
+    [InlineData(0, 5, "نفد المخزون")]
+    [InlineData(-1, 5, "رصيد سالب")]
+    public void StockBalanceItem_ReturnsArabicInventoryStatus(
+        decimal quantity,
+        decimal minimum,
+        string expected)
+    {
+        var item = new StockBalanceItem(
+            Guid.NewGuid(), "P-1", "منتج", "تصنيف", "قطعة",
+            quantity, minimum, 10, quantity * 10, 0);
+
+        item.StockStatus.Should().Be(expected);
+    }
+
     private static Mock<ILookupService> CreateLookupMock(Unit unit)
     {
         var lookup = new Mock<ILookupService>();

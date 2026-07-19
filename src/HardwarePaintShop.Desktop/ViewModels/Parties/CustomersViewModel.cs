@@ -5,6 +5,9 @@ using HardwarePaintShop.Application.Models;
 using HardwarePaintShop.Desktop.ViewModels;
 using HardwarePaintShop.Domain.Entities;
 using System.Collections.ObjectModel;
+using HardwarePaintShop.Desktop.Views.Parties;
+using Microsoft.Extensions.DependencyInjection;
+using System.Windows;
 
 namespace HardwarePaintShop.Desktop.ViewModels.Parties;
 
@@ -231,6 +234,31 @@ public partial class CustomersViewModel : BaseViewModel
         finally
         {
             IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task OpenStatementAsync(CustomerListItem? item)
+    {
+        if (item is null)
+        {
+            ShowError("اختر العميل أولًا.");
+            return;
+        }
+        try
+        {
+            var viewModel = App.Services.GetRequiredService<CustomerStatementViewModel>();
+            await viewModel.InitializeAsync(item.Id);
+            var window = new CustomerStatementWindow
+            {
+                DataContext = viewModel,
+                Owner = System.Windows.Application.Current.MainWindow
+            };
+            window.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            ShowError(ex.Message);
         }
     }
 

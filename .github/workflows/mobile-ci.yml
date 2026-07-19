@@ -1,0 +1,57 @@
+name: Mobile CI
+
+on:
+  push:
+    branches:
+      - main
+      - refactor/flutter-feature-first
+    paths:
+      - 'mobile/HardwarePaintShopMobile/**'
+      - '.github/workflows/mobile-ci.yml'
+  pull_request:
+    paths:
+      - 'mobile/HardwarePaintShopMobile/**'
+      - '.github/workflows/mobile-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  analyze-test-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: mobile/HardwarePaintShopMobile
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Flutter stable
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate missing Android platform files
+        run: flutter create --platforms=android --org com.hardwarepaintshop .
+
+      - name: Resolve packages
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Run tests
+        run: flutter test
+
+      - name: Build debug APK
+        run: flutter build apk --debug
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: hardware-paint-shop-mobile-debug
+          path: mobile/HardwarePaintShopMobile/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error

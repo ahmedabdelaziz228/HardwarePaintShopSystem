@@ -1,0 +1,47 @@
+name: Desktop CI
+
+on:
+  push:
+    branches:
+      - main
+      - refactor/flutter-feature-first
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'HardwarePaintShopSystem.sln'
+      - '.github/workflows/desktop-ci.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'HardwarePaintShopSystem.sln'
+      - '.github/workflows/desktop-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore .\HardwarePaintShopSystem.sln
+
+      - name: Build
+        run: dotnet build .\HardwarePaintShopSystem.sln -c Release --no-restore
+
+      - name: Run unit tests
+        run: dotnet test .\tests\HardwarePaintShop.UnitTests\HardwarePaintShop.UnitTests.csproj -c Release --no-build
+
+      - name: Run integration test project
+        run: dotnet test .\tests\HardwarePaintShop.IntegrationTests\HardwarePaintShop.IntegrationTests.csproj -c Release --no-build

@@ -9,8 +9,12 @@ namespace HardwarePaintShop.Desktop.ViewModels.Dashboard;
 public partial class DashboardViewModel : BaseViewModel
 {
     private readonly IDashboardService _dashboardService;
+    private readonly IAuthService? _authService;
 
     [ObservableProperty] private decimal _todaySales;
+    [ObservableProperty] private decimal _estimatedTodayProfit;
+    [ObservableProperty] private decimal _inventoryValue;
+    [ObservableProperty] private decimal _salesChangePercentage;
     [ObservableProperty] private decimal _todayCollections;
     [ObservableProperty] private decimal _todayExpenses;
     [ObservableProperty] private decimal _cashboxBalance;
@@ -26,10 +30,14 @@ public partial class DashboardViewModel : BaseViewModel
     [ObservableProperty] private string _lastUpdatedText = string.Empty;
     [ObservableProperty] private string _statusMessage = string.Empty;
     [ObservableProperty] private ObservableCollection<LowStockProductSummary> _lowStockProducts = new();
+    [ObservableProperty] private ObservableCollection<DashboardTrendPoint> _weeklyTrend = new();
+    [ObservableProperty] private ObservableCollection<InventoryCategorySummary> _inventoryByCategory = new();
+    [ObservableProperty] private ObservableCollection<RecentOperationSummary> _recentOperations = new();
 
-    public DashboardViewModel(IDashboardService dashboardService)
+    public DashboardViewModel(IDashboardService dashboardService, IAuthService? authService = null)
     {
         _dashboardService = dashboardService;
+        _authService = authService;
         UpdateGreeting();
         _ = RefreshAsync();
     }
@@ -43,6 +51,9 @@ public partial class DashboardViewModel : BaseViewModel
         {
             var summary = await _dashboardService.GetSummaryAsync();
             TodaySales = summary.TodaySales;
+            EstimatedTodayProfit = summary.EstimatedTodayProfit;
+            InventoryValue = summary.InventoryValue;
+            SalesChangePercentage = summary.SalesChangePercentage;
             TodayCollections = summary.TodayCollections;
             TodayExpenses = summary.TodayExpenses;
             CashboxBalance = summary.CashboxBalance;
@@ -55,6 +66,9 @@ public partial class DashboardViewModel : BaseViewModel
             ActiveSupplierCount = summary.ActiveSupplierCount;
             LowStockCount = summary.LowStockCount;
             LowStockProducts = new ObservableCollection<LowStockProductSummary>(summary.LowStockProducts);
+            WeeklyTrend = new ObservableCollection<DashboardTrendPoint>(summary.WeeklyTrend);
+            InventoryByCategory = new ObservableCollection<InventoryCategorySummary>(summary.InventoryByCategory);
+            RecentOperations = new ObservableCollection<RecentOperationSummary>(summary.RecentOperations);
             LastUpdatedText = $"آخر تحديث {DateTime.Now:hh:mm tt}";
             UpdateGreeting();
         }
@@ -71,6 +85,8 @@ public partial class DashboardViewModel : BaseViewModel
     private void UpdateGreeting()
     {
         var hour = DateTime.Now.Hour;
-        Greeting = hour < 12 ? "صباح الخير" : hour < 18 ? "مساء الخير" : "مساء النور";
+        var welcome = hour < 12 ? "صباح الخير" : hour < 18 ? "مساء الخير" : "مساء النور";
+        var userName = _authService?.CurrentUserName;
+        Greeting = string.IsNullOrWhiteSpace(userName) ? welcome : $"{welcome}، {userName}";
     }
 }
