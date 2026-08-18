@@ -17,7 +17,3 @@ The purpose of this work is to define the main user interactions, understand the
 The complete diagrams and UX documentation are available on Figma:
 
 https://www.figma.com/board/17dGMtsepiTPYNQJdl84WK/WiseGrader?node-id=0-1&t=UKWFYBgDj6UIsmm3-1
-
-## Contribution
-
-Designed and documented as part of the WiseGrader system analysis and UI/UX design phase.
